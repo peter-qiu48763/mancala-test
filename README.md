@@ -2,9 +2,6 @@
 
 一款霓虹風格且功能完整的簡單播棋（Mancala）網頁遊戲，支援單人對戰電腦與雙人對戰模式，具備多種 AI 難度與現代化 UI 動畫。
 
-![Mancala Game Screenshot](https://via.placeholder.com/800x400/1e1e1e/00E5FF?text=Mancala+Pro+Game+Interface)  
-*遊戲畫面示意（實際畫面請運行專案查看）*
-
 ---
 
 ##  遊戲簡介
@@ -51,7 +48,6 @@
 1. 下載專案檔案（`index.html`、`manifest.json`、`sw.js`、`icon-192.png`）
 2. 使用任何網頁伺服器開啟 `index.html`
    - 或直接雙擊 `index.html`（部分瀏覽器可能限制 Service Worker）
-3. 建議使用 Live Server（VSCode 擴充功能）獲得最佳體驗
 
 ### 安裝為 PWA（手機/桌面）
 1. 在支援的瀏覽器（Chrome、Edge、Safari）中開啟遊戲
@@ -159,18 +155,6 @@ mancala-pro/
 - 遊戲規則參考自傳統播棋（Mancala/Kalah）
 - AI 演算法參考 Minimax 與棋類遊戲通用設計模式
 - 設計靈感來自現代策略遊戲 UI
-
----
-
-##  立即開始
-
-```bash
-# 1. 複製專案或下載檔案
-# 2. 使用網頁伺服器開啟
-python3 -m http.server  # 或任何靜態伺服器
-# 3. 在瀏覽器開啟 http://localhost:8000
-# 4. 選擇模式，開始對戰！
-```
 
 ---
 
