@@ -2,6 +2,8 @@
 
 一款功能完整的簡單播棋（Mancala）網頁遊戲，支援單人對戰電腦與雙人對戰模式，具備多種 AI 難度與現代化 UI 動畫。
 
+![Mancala Game Screenshot](https://github.com/user-attachments/assets/0aeb8caf-ce51-4ba6-b62b-bb08dd24b58c)  
+*遊戲畫面示意（實際畫面請運行專案查看）*
 
 ##  遊戲簡介
 
