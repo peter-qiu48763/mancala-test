@@ -1,0 +1,1485 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <link rel="manifest" href="manifest.json">
+
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black">
+    <link rel="apple-touch-icon" href="icon-192.png">
+
+    <script>
+      if ("serviceWorker" in navigator) {
+        navigator.serviceWorker.register("sw.js");
+      }
+    </script>
+
+   <meta charset="UTF-8">
+   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+   <title>播棋 Mancala Pro</title>
+   <style>
+       :root {
+           --bg-color: #121212;
+           --container-bg: #1e1e1e;
+           --pit-bg: #2a2a2a;
+           --pit-border: 2px solid #333;
+           --neon-1: #00E5FF;
+           --neon-2: #FF4081;
+           --neon-3: #FFEA00;
+           --text-color: #E0E0E0;
+           --accent-color: #1e1e1e;
+       }
+
+       body {
+           margin: 0;
+           padding: 0;
+           font-family: 'Noto Sans TC','Segoe UI', Roboto, "Microsoft JhengHei", sans-serif;
+           background-color: var(--bg-color);
+           color: var(--text-color);
+           display: flex;
+           justify-content: center;
+           align-items: center;
+           min-height: 100vh;
+           overflow: hidden;
+           user-select: none;
+           -webkit-user-select: none;
+           touch-action: manipulation;
+           background-image: radial-gradient(circle at 10% 20%, rgba(124, 77, 255, 0.1) 0%, transparent 20%),
+                             radial-gradient(circle at 90% 80%, rgba(0, 229, 255, 0.1) 0%, transparent 20%);
+       }
+
+       .game-container {
+           position: relative;
+           width: 95vw;
+           max-width: 900px;
+           background: var(--container-bg);
+           border-radius: 30px;
+           box-shadow: 0 30px 60px rgba(0,0,0,0.6);
+           padding: 30px;
+           display: flex;
+           flex-direction: column;
+           align-items: center;
+           border: 1px solid #333;
+           box-sizing: border-box;
+       }
+
+       .header {
+           width: 100%;
+           display: flex;
+           justify-content: space-between;
+           align-items: center;
+           margin-bottom: 20px;
+           z-index: 10;
+       }
+
+       .controls-left, .controls-right {
+           display: flex;
+           gap: 10px;
+           flex-wrap: wrap;
+       }
+
+       .btn {
+           background: rgba(255, 255, 255, 0.05);
+           backdrop-filter: blur(10px);
+           -webkit-backdrop-filter: blur(10px);
+           border: 1px solid rgba(255, 255, 255, 0.1);
+           color: var(--text-color);
+           padding: 10px 15px;
+           border-radius: 12px;
+           cursor: pointer;
+           font-weight: 600;
+           transition: all 0.3s ease;
+           display: flex;
+           align-items: center;
+           justify-content: center;
+           box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+           text-shadow: 0 1px 2px rgba(0,0,0,0.8); 
+           white-space: nowrap;
+           font-size: 0.9rem;
+       }
+
+       .btn:hover:not(:disabled) {
+           background: rgba(255, 255, 255, 0.15);
+           border-color: rgba(255, 255, 255, 0.3);
+           transform: translateY(-2px);
+           box-shadow: 0 8px 15px rgba(0, 0, 0, 0.2);
+           color: #fff;
+       }
+
+       .btn:disabled {
+           opacity: 0.3;
+           cursor: not-allowed;
+           transform: none;
+           background: rgba(0,0,0,0.2);
+           box-shadow: none;
+           border-color: #333;
+       }
+
+       /* 下拉選單樣式優化 */
+       select.btn {
+           appearance: none;
+           padding-right: 30px;
+           background-image: url("data:image/svg+xml;charset=UTF-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%23ffffff'%3E%3Cpath d='M7 10l5 5 5-5z'/%3E%3C/svg%3E");
+           background-repeat: no-repeat;
+           background-position: right 8px center;
+           background-size: 16px;
+       }
+       select.btn option {
+           background-color: #252525;
+           color: #fff;
+       }
+       
+       select#difficulty-select {
+           border-color: rgba(255, 255, 255, 0.1); /* Default border */
+           font-weight: bold;
+       }
+
+       .turn-indicator {
+           font-size: 1.2rem;
+           font-weight: bold;
+           color: #fff;
+           padding: 10px 30px;
+           background: rgba(255, 255, 255, 0.03);
+           backdrop-filter: blur(10px);
+           border-radius: 50px;
+           border: 1px solid rgba(255, 255, 255, 0.1);
+           min-width: 150px;
+           text-align: center;
+           position: relative;
+           overflow: hidden;
+           box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+           transition: all 0.3s;
+       }
+
+       .turn-indicator::after {
+           content: '';
+           position: absolute;
+           bottom: 0; left: 0; width: 100%; height: 2px;
+           background: linear-gradient(90deg, transparent, var(--neon-1), var(--neon-2), transparent);
+           transform: scaleX(0);
+           transition: transform 0.4s ease;
+       }
+
+       .turn-indicator.active {
+           border-color: rgba(255, 255, 255, 0.2);
+       }
+       .turn-indicator.active::after {
+           transform: scaleX(1);
+       }
+
+       .board {
+           display: flex;
+           justify-content: space-between;
+           align-items: stretch;
+           background: #222;
+           padding: 25px;
+           border-radius: 30px;
+           width: 100%;
+           box-sizing: border-box;
+           gap: 20px;
+           position: relative;
+       }
+
+       .store {
+           width: 100px;
+           min-height: 180px;
+           background: var(--pit-bg);
+           border-radius: 25px;
+           border: var(--pit-border);
+           display: flex;
+           flex-direction: column;
+           justify-content: center;
+           align-items: center;
+           position: relative;
+           transition: all 0.3s;
+       }
+       
+       .store.highlight-turn {
+           border-color: rgba(255, 255, 255, 0.5);
+           box-shadow: 0 0 20px rgba(255, 255, 255, 0.05);
+           background: #333;
+       }
+
+       .pits-area {
+           flex: 1;
+           display: flex;
+           flex-direction: column;
+           justify-content: space-between;
+           gap: 25px;
+       }
+
+       .row {
+           display: flex;
+           justify-content: space-around;
+           gap: 5px;
+       }
+
+       .pit {
+           width: 80px;
+           height: 80px;
+           background: var(--pit-bg);
+           border-radius: 50%;
+           border: var(--pit-border);
+           display: flex;
+           justify-content: center;
+           align-items: center;
+           cursor: pointer;
+           position: relative;
+           transition: all 0.2s;
+       }
+
+       /* 呼吸燈動畫 */
+       @keyframes breathing-glow {
+           0% { box-shadow: 0 0 0px rgba(255, 255, 255, 0); border-color: #333; }
+           50% { box-shadow: 0 0 15px rgba(255, 255, 255, 0.4); border-color: rgba(255, 255, 255, 0.6); }
+           100% { box-shadow: 0 0 0px rgba(255, 255, 255, 0); border-color: #333; }
+       }
+
+       /* 當前回合玩家的坑洞發光 Class */
+       .pit.active-turn-glow {
+           animation: breathing-glow 2s infinite ease-in-out;
+           z-index: 5;
+       }
+
+       .pit:hover:not(.disabled) {
+           background: #333;
+           transform: translateY(-2px);
+           border-color: var(--neon-1);
+           box-shadow: 0 0 15px rgba(255, 255, 255, 0.3);
+       }
+       
+       .pit.capture-flash {
+           animation: flashHighlight 0.5s ease !important; /* 強制覆蓋呼吸燈 */
+       }
+
+       @keyframes flashHighlight {
+           0% { background-color: var(--pit-bg); box-shadow: 0 0 0 transparent; }
+           50% { background-color: #444; box-shadow: 0 0 20px var(--neon-2); border-color: var(--neon-2); }
+           100% { background-color: var(--pit-bg); box-shadow: 0 0 0 transparent; }
+       }
+
+       .pit.disabled {
+           cursor: default;
+           opacity: 0.7;
+           animation: none; /* 禁用時不發光 */
+       }
+
+       .seed-count-badge {
+           position: absolute;
+           top: -8px;
+           right: -8px;
+           width: 26px;
+           height: 26px;
+           background: #3a3a3a;
+           color: #fff;
+           border-radius: 50%;
+           font-size: 0.9rem;
+           font-weight: bold;
+           display: flex;
+           justify-content: center;
+           align-items: center;
+           box-shadow: 0 2px 5px rgba(0,0,0,0.3);
+           z-index: 6;
+           border: 1px solid #555;
+           transition: transform 0.2s;
+       }
+       
+       .seeds-container {
+           width: 65%;
+           height: 65%;
+           display: flex;
+           flex-wrap: wrap;
+           justify-content: center;
+           align-items: center;
+           gap: 4px;
+           pointer-events: none;
+       }
+
+       .seed {
+           width: 12px;
+           height: 12px;
+           border-radius: 50%;
+           background-color: var(--neon-1);
+           box-shadow: 0 0 4px rgba(0, 229, 255, 0.6); 
+       }
+       .seed:nth-child(2n) { background-color: var(--neon-2); box-shadow: 0 0 4px rgba(255, 64, 129, 0.6); }
+       .seed:nth-child(3n) { background-color: var(--neon-3); box-shadow: 0 0 4px rgba(255, 234, 0, 0.6); }
+
+       .label {
+           position: absolute;
+           color: #aaa;
+           font-size: 0.85rem;
+           text-transform: uppercase;
+           letter-spacing: 1px;
+           font-weight: 600;
+           text-align: center;
+           width: 100%;
+       }
+       .store.top .label { bottom: 15px; }
+       .store.bottom .label { top: 15px; }
+
+       #center-message {
+           position: absolute;
+           top: 50%;
+           left: 50%;
+           transform: translate(-50%, -50%);
+           font-size: 3.5rem;
+           color: #FFF;
+           font-weight: 900;
+           text-shadow: 0 4px 10px rgba(0,0,0,0.8);
+           pointer-events: none;
+           z-index: 100;
+           opacity: 0;
+           transition: opacity 0.3s;
+           text-align: center;
+           width: 100%;
+           letter-spacing: 3px;
+           white-space: nowrap;
+       }
+
+       .flying-seed {
+           position: fixed;
+           width: 14px;
+           height: 14px;
+           background-color: #fff;
+           border-radius: 50%;
+           z-index: 999;
+           pointer-events: none;
+           box-shadow: 0 0 10px #fff;
+           transition: all 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+       }
+       
+       .ai-bubble {
+           position: absolute;
+           top: -60px;
+           left: 50%;
+           transform: translateX(-50%);
+           background: rgba(0, 0, 0, 0.8);
+           border: 1px solid var(--neon-2);
+           color: var(--neon-2);
+           padding: 10px 15px;
+           border-radius: 15px;
+           border-bottom-left-radius: 0;
+           font-size: 0.9rem;
+           min-width: 150px;
+           text-align: center;
+           box-shadow: 0 0 15px rgba(255, 64, 129, 0.3);
+           opacity: 0;
+           transition: opacity 0.5s;
+           pointer-events: none;
+           z-index: 50;
+       }
+       .ai-bubble.visible { opacity: 1; }
+
+       .modal {
+           display: none;
+           position: fixed;
+           top: 0; left: 0; width: 100%; height: 100%;
+           background: rgba(0,0,0,0.85);
+           backdrop-filter: blur(8px);
+           z-index: 200;
+           justify-content: center;
+           align-items: center;
+       }
+
+       .modal-content {
+           background: #252525;
+           padding: 35px;
+           border-radius: 20px;
+           max-width: 500px;
+           width: 90%;
+           box-shadow: 0 10px 40px rgba(0,0,0,0.5);
+           border: 1px solid #444;
+           position: relative;
+           color: #ddd;
+           text-align: center;
+       }
+
+       .modal h2 {
+           color: var(--neon-1);
+           margin-top: 0;
+           border-bottom: 1px solid #444;
+           padding-bottom: 15px;
+           margin-bottom: 20px;
+           text-align: left;
+       }
+       
+       .modal-content.centered-text h2 {
+           text-align: center;
+       }
+
+       .close-btn {
+           position: absolute;
+           top: 15px;
+           right: 20px;
+           font-size: 28px;
+           cursor: pointer;
+           color: #888;
+           transition: color 0.2s;
+       }
+       .close-btn:hover { color: #fff; }
+       
+       .selection-btn-container {
+           display: flex;
+           gap: 15px;
+           justify-content: center;
+           margin-top: 25px;
+       }
+       
+       .selection-btn-container .btn {
+           min-width: 120px;
+           font-size: 1.1rem;
+       }
+
+       @media (max-width: 1024px) {
+           .game-container { padding: 20px; width: 98vw; }
+           .pit { width: 60px; height: 60px; }
+           .store { width: 80px; }
+       }
+
+       @media (max-width: 768px) {
+           .game-container { padding: 10px; border-radius: 15px; border: none; box-shadow: none; }
+           .header { flex-direction: column; gap: 10px; margin-bottom: 10px; }
+           .controls-left, .controls-right { width: 100%; justify-content: center; gap: 8px; }
+           .turn-indicator { width: 90%; padding: 8px 10px; min-width: auto; font-size: 1rem; }
+           .board { padding: 8px; gap: 5px; border-radius: 15px; }
+           .pits-area { gap: 8px; }
+           .pit { width: 11.5vw; height: 11.5vw; max-width: 50px; max-height: 50px; }
+           .store { width: 13vw; max-width: 60px; min-height: auto; height: auto; border-radius: 15px; }
+           .label { font-size: 0.7rem; }
+           .seed { width: 6px; height: 6px; }
+           .seed-count-badge { width: 18px; height: 18px; font-size: 0.7rem; }
+           .btn { padding: 8px 12px; font-size: 0.85rem; border-radius: 10px; }
+           #center-message { font-size: 2rem; white-space: normal; width: 90%; }
+           .ai-bubble { top: auto; bottom: 110%; left: 0; transform: none; width: 150px; }
+       }
+   </style>
+</head>
+<body>
+
+   <div class="game-container">
+       <!-- 頂部資訊列 -->
+       <div class="header">
+           <div class="controls-left">
+               <button class="btn" onclick="toggleRules()">
+                   <span style="font-size: 1em;">規則</span>
+               </button>
+               <select id="mode-select" class="btn" onchange="prepareGame()">
+                   <option value="pve">單人練習</option>
+                   <option value="pvp">雙人對戰</option>
+               </select>
+               <!-- 難度選擇 (僅 PVE 顯示) -->
+               <select id="difficulty-select" class="btn" onchange="updateDifficultyStyle(); prepareGame()">
+                   <option value="easy">難度：簡單</option>
+                   <option value="normal" selected>難度：普通</option>
+                   <option value="hard">難度：困難</option>
+                   <option value="expert">難度：專家</option>
+                   <option value="special">難度：特別</option>
+               </select>
+           </div>
+
+           <div id="turn-display" class="turn-indicator active">
+               遊戲準備中
+           </div>
+
+           <div class="controls-right">
+               <button id="undo-btn" class="btn" onclick="undoMove()" disabled>
+                   <span style="font-size: 1em;">上一步</span>
+               </button>
+               <button id="reset-btn" class="btn" onclick="prepareGame()">
+                   <span style="font-size: 1em;">重置</span>
+               </button>
+           </div>
+       </div>
+
+       <!-- 遊戲棋盤 -->
+       <div class="board">
+           <!-- 玩家 2 (NPC) 的計分洞 -->
+           <div class="store top" id="store-13">
+               <div class="label" id="label-p2" style="top:15px;">電腦</div>
+               <div class="seed-count-badge">0</div>
+               <div class="seeds-container"></div>
+               <!-- 對話氣泡 -->
+               <div id="npc-bubble" class="ai-bubble">example message</div>
+           </div>
+
+           <div class="pits-area">
+               <!-- 玩家 2 的坑洞 (上方，索引 12 -> 7) -->
+               <div class="row" id="row-p2">
+                   <div class="pit" data-id="12"><div class="seed-count-badge">4</div><div class="seeds-container"></div></div>
+                   <div class="pit" data-id="11"><div class="seed-count-badge">4</div><div class="seeds-container"></div></div>
+                   <div class="pit" data-id="10"><div class="seed-count-badge">4</div><div class="seeds-container"></div></div>
+                   <div class="pit" data-id="9"><div class="seed-count-badge">4</div><div class="seeds-container"></div></div>
+                   <div class="pit" data-id="8"><div class="seed-count-badge">4</div><div class="seeds-container"></div></div>
+                   <div class="pit" data-id="7"><div class="seed-count-badge">4</div><div class="seeds-container"></div></div>
+               </div>
+
+               <!-- 玩家 1 的坑洞 (下方，索引 0 -> 5) -->
+               <div class="row" id="row-p1">
+                   <div class="pit" data-id="0"><div class="seed-count-badge">4</div><div class="seeds-container"></div></div>
+                   <div class="pit" data-id="1"><div class="seed-count-badge">4</div><div class="seeds-container"></div></div>
+                   <div class="pit" data-id="2"><div class="seed-count-badge">4</div><div class="seeds-container"></div></div>
+                   <div class="pit" data-id="3"><div class="seed-count-badge">4</div><div class="seeds-container"></div></div>
+                   <div class="pit" data-id="4"><div class="seed-count-badge">4</div><div class="seeds-container"></div></div>
+                   <div class="pit" data-id="5"><div class="seed-count-badge">4</div><div class="seeds-container"></div></div>
+               </div>
+           </div>
+
+           <!-- 玩家 1 的計分洞 (右側) -->
+           <div class="store bottom" id="store-6">
+               <div class="label" id="label-p1" style="bottom:15px;">玩家 1</div>
+               <div class="seed-count-badge">0</div>
+               <div class="seeds-container"></div>
+           </div>
+       </div>
+
+       <div id="center-message"></div>
+   </div>
+
+   <!-- 規則彈窗 -->
+   <div id="rules-modal" class="modal">
+       <div class="modal-content">
+           <span class="close-btn" onclick="toggleRules()">×</span>
+           <h2>📖 播棋 (Mancala) 規則</h2>
+           <p><strong>目標：</strong> 遊戲結束時，己方計分洞（大洞）內的棋子比對手多。</p>
+           <ul>
+               <li><strong>移動：</strong> 點擊己方小洞，取出所有棋子，逆時針依序播撒。</li>
+               <li><strong>計分洞：</strong> 經過自己計分洞時會放入一顆，經過對手的則跳過。</li>
+               <li><strong>再來一次：</strong> 最後一顆落入自己的計分洞，可額外獲得一回合。</li>
+               <li><strong>捕獲：</strong> 最後一顆落入己方空洞且對面有棋子，兩邊棋子都放入大洞。</li>
+               <li><strong>結束：</strong> 一方清空所有小洞時結束，對手剩餘棋子歸對手所有。</li>
+           </ul>
+       </div>
+   </div>
+
+   <!-- PVE 先手選擇彈窗 -->
+   <div id="turn-selection-modal" class="modal">
+       <div class="modal-content centered-text">
+           <span class="close-btn" onclick="closeTurnSelection()">×</span>
+           <h2>誰先開始？</h2>
+           <div class="selection-btn-container">
+               <button class="btn" onclick="startGameWithPlayer(1)">玩家先手</button>
+               <button class="btn" onclick="startGameWithPlayer(2)">電腦先手</button>
+           </div>
+       </div>
+   </div>
+
+   <script>
+       const TOTAL_PITS = 14;
+       const P1_STORE = 6;
+       const P2_STORE = 13;
+       const INITIAL_SEEDS = 4;
+       
+       let board = [];
+       let currentPlayer = 1;
+       let gameActive = false;
+       let isAnimating = false;
+       let gameMode = 'pve';
+       let aiDifficulty = 'normal';
+       // 追蹤實際難度，取消選擇時復原
+       let activeGameDifficulty = 'normal';
+       let historyStack = [];
+
+       function init() {
+           document.querySelectorAll('.pit').forEach(pit => {
+               pit.addEventListener('click', () => handlePitClick(parseInt(pit.dataset.id)));
+           });
+           updateDifficultyStyle(); 
+           prepareGame(); 
+       }
+       
+       function updateDifficultyStyle() {
+           const select = document.getElementById('difficulty-select');
+           const val = select.value;
+           let color = '#fff';
+           
+           if (val === 'easy') color = '#2979FF';        // 深藍色
+           else if (val === 'normal') color = '#4CAF50'; // 綠色
+           else if (val === 'hard') color = '#FFC107';   // 橘黃色
+           else if (val === 'expert') color = '#FF5252'; // 紅色
+           else if (val === 'special') color = '#FF4081'; // 桃紅色
+           
+           select.style.color = color;
+       }
+
+       function prepareGame() {
+           const modeSelector = document.getElementById('mode-select');
+           const diffSelector = document.getElementById('difficulty-select');
+           gameMode = modeSelector.value;
+           aiDifficulty = diffSelector.value;
+           
+           diffSelector.style.display = gameMode === 'pve' ? 'block' : 'none';
+
+           if (gameMode === 'pve') {
+               document.getElementById('turn-selection-modal').style.display = 'flex';
+               updateControlsState(); // 更新按鈕狀態
+           } else {
+               const randomStarter = Math.random() < 0.5 ? 1 : 2;
+               startGameWithPlayer(randomStarter);
+           }
+       }
+
+       // 關閉先手選擇時，復原難度設定
+       function closeTurnSelection() {
+           document.getElementById('turn-selection-modal').style.display = 'none';
+           
+           // 如果只換難度但沒開始，將 UI 復原成實際難度
+           const diffSelector = document.getElementById('difficulty-select');
+           if (diffSelector.value !== activeGameDifficulty) {
+               diffSelector.value = activeGameDifficulty;
+               aiDifficulty = activeGameDifficulty; // 確保邏輯變數也復原
+               updateDifficultyStyle();
+           }
+       }
+
+       function startGameWithPlayer(starter) {
+           if (isAnimating) return; // 動畫中禁止開始
+
+           document.getElementById('turn-selection-modal').style.display = 'none';
+           
+           // 確保難度已更新
+           activeGameDifficulty = aiDifficulty;
+
+           board = Array(TOTAL_PITS).fill(INITIAL_SEEDS);
+           board[P1_STORE] = 0;
+           board[P2_STORE] = 0;
+           currentPlayer = starter;
+           gameActive = true;
+           isAnimating = false;
+           historyStack = [];
+           
+           document.getElementById('label-p1').innerText = "玩家 1";
+           let npcName = "電腦";
+           if (gameMode === 'pve') {
+               if (activeGameDifficulty === 'easy') npcName = "簡單電腦";
+               else if (activeGameDifficulty === 'normal') npcName = "普通電腦";
+               else if (activeGameDifficulty === 'hard') npcName = "困難電腦";
+               else if (activeGameDifficulty === 'expert') npcName = "專家電腦";
+               else if (activeGameDifficulty === 'special') npcName = "特別電腦";
+           } else {
+               npcName = "玩家 2";
+           }
+           document.getElementById('label-p2').innerText = npcName;
+           
+           const turnDisplay = document.getElementById('turn-display');
+           turnDisplay.classList.add('active');
+
+           updateBoardUI();
+           updateTurnDisplay();
+           updateControlsState(); 
+           updateClickableState();
+           hideNpcBubble();
+
+           let starterName = "";
+           if (gameMode === 'pve') {
+               starterName = starter === 1 ? "玩家先手" : "電腦先手";
+           } else {
+               starterName = starter === 1 ? "玩家 1 先手" : "玩家 2 先手";
+           }
+           
+           showMessage("遊戲開始", 1500, starterName);
+
+           if (gameMode === 'pve' && currentPlayer === 2) {
+               setTimeout(npcLogic, 1500);
+           }
+       }
+
+       function saveState() {
+           const state = JSON.stringify({ board: board, currentPlayer: currentPlayer });
+           historyStack.push(state);
+           updateControlsState();
+       }
+
+       function undoMove() {
+           if (isAnimating || !gameActive || historyStack.length === 0) return;
+
+           const previousState = JSON.parse(historyStack.pop());
+           board = previousState.board;
+           currentPlayer = previousState.currentPlayer;
+
+           updateBoardUI();
+           updateTurnDisplay();
+           updateClickableState();
+           updateControlsState();
+           showMessage("回到上一步", 800);
+       }
+
+       function updateControlsState() {
+           const undoBtn = document.getElementById('undo-btn');
+           const resetBtn = document.getElementById('reset-btn');
+           const modeSelect = document.getElementById('mode-select');
+           const diffSelect = document.getElementById('difficulty-select');
+           
+           // 先手選擇跳窗內的按鈕
+           const turnSelectionBtns = document.querySelectorAll('#turn-selection-modal .btn');
+
+           if (isAnimating) {
+               undoBtn.disabled = true;
+               resetBtn.disabled = true;
+               modeSelect.disabled = true;
+               diffSelect.disabled = true;
+               turnSelectionBtns.forEach(btn => btn.disabled = true);
+           } else {
+               undoBtn.disabled = historyStack.length === 0 || !gameActive;
+               resetBtn.disabled = false; 
+               modeSelect.disabled = false;
+               diffSelect.disabled = false;
+               turnSelectionBtns.forEach(btn => btn.disabled = false);
+           }
+       }
+
+       function handlePitClick(index) {
+           if (!gameActive || isAnimating) return;
+           
+           // PVE禁止玩家點擊 (7-12)
+           if (gameMode === 'pve' && index >= 7 && index <= 12) {
+               return;
+           }
+
+           if (currentPlayer === 1 && (index < 0 || index > 5)) return;
+           if (currentPlayer === 2 && (index < 7 || index > 12)) return;
+           
+           if (board[index] === 0) {
+               showMessage("不可選擇空洞", 800);
+               return;
+           }
+
+           saveState();
+           playTurn(index);
+       }
+
+       async function playTurn(startIndex) {
+           isAnimating = true;
+           updateClickableState(); 
+           updateControlsState(); 
+
+           let seeds = board[startIndex];
+           board[startIndex] = 0;
+           updatePitUI(startIndex);
+           
+           let currentIndex = startIndex;
+           
+           for (let i = 0; i < seeds; i++) {
+               currentIndex = (currentIndex + 1) % TOTAL_PITS;
+               if (currentPlayer === 1 && currentIndex === P2_STORE) {
+                   currentIndex = (currentIndex + 1) % TOTAL_PITS;
+               } else if (currentPlayer === 2 && currentIndex === P1_STORE) {
+                   currentIndex = (currentIndex + 1) % TOTAL_PITS;
+               }
+
+               await animateSeedTransfer(startIndex, currentIndex);
+               board[currentIndex]++;
+               updatePitUI(currentIndex);
+           }
+
+           // 捕獲
+           let captured = false;
+           const isMySide = (currentPlayer === 1 && currentIndex >= 0 && currentIndex <= 5) ||
+                            (currentPlayer === 2 && currentIndex >= 7 && currentIndex <= 12);
+           
+           if (isMySide && board[currentIndex] === 1 && currentIndex !== P1_STORE && currentIndex !== P2_STORE) {
+               const oppositeIndex = 12 - currentIndex;
+               if (board[oppositeIndex] > 0) {
+                   showMessage("捕獲", 1000, "對手棋子歸你！");
+                   highlightPit(currentIndex);
+                   highlightPit(oppositeIndex);
+                   await new Promise(r => setTimeout(r, 600));
+
+                   const myStore = currentPlayer === 1 ? P1_STORE : P2_STORE;
+                   
+                   await Promise.all([
+                       animateSeedTransfer(oppositeIndex, myStore),
+                       animateSeedTransfer(currentIndex, myStore)
+                   ]);
+
+                   const captureAmount = board[oppositeIndex] + board[currentIndex];
+                   board[oppositeIndex] = 0;
+                   board[currentIndex] = 0;
+                   board[myStore] += captureAmount;
+                   
+                   updatePitUI(currentIndex);
+                   updatePitUI(oppositeIndex);
+                   updatePitUI(myStore);
+                   captured = true;
+               }
+           }
+
+           const landedInStore = (currentPlayer === 1 && currentIndex === P1_STORE) ||
+                                 (currentPlayer === 2 && currentIndex === P2_STORE);
+
+           checkGameOver();
+
+           if (gameActive) {
+               if (landedInStore) {
+                   showMessage("再來一次", 1000, "最後一顆落入計分洞");
+               } else {
+                   currentPlayer = currentPlayer === 1 ? 2 : 1;
+               }
+               
+               updateTurnDisplay();
+               isAnimating = false;
+               updateClickableState();
+               updateControlsState(); 
+
+               if (gameMode === 'pve' && currentPlayer === 2 && gameActive) {
+                   setTimeout(npcLogic, 1000);
+               }
+           } else {
+               isAnimating = false;
+               updateControlsState();
+           }
+       }
+
+        /* ---------------- AI Helpers ---------------- */
+
+        function simulateMove(currentBoard, player, moveIdx) {
+            let simBoard = [...currentBoard];
+            let seeds = simBoard[moveIdx];
+            simBoard[moveIdx] = 0;
+            let currentIdx = moveIdx;
+            
+            const myStore = player === 1 ? P1_STORE : P2_STORE;
+            const oppStore = player === 1 ? P2_STORE : P1_STORE;
+
+            for(let i=0; i<seeds; i++) {
+                currentIdx = (currentIdx + 1) % 14;
+                if (currentIdx === oppStore) currentIdx = (currentIdx + 1) % 14;
+                simBoard[currentIdx]++;
+            }
+
+            const isMySide = (player === 1 && currentIdx >= 0 && currentIdx <= 5) ||
+                             (player === 2 && currentIdx >= 7 && currentIdx <= 12);
+            
+            if (isMySide && simBoard[currentIdx] === 1 && currentIdx !== P1_STORE && currentIdx !== P2_STORE) {
+                const oppIdx = 12 - currentIdx;
+                if (simBoard[oppIdx] > 0) {
+                    simBoard[myStore] += (simBoard[oppIdx] + 1);
+                    simBoard[oppIdx] = 0;
+                    simBoard[currentIdx] = 0;
+                }
+            }
+
+            let nextPlayer = player;
+            if (currentIdx !== myStore) {
+                nextPlayer = player === 1 ? 2 : 1;
+            }
+
+            return { board: simBoard, nextPlayer: nextPlayer };
+        }
+
+        function totalSeedsInPlay() {
+            return board.slice(0, 6).concat(board.slice(7, 13)).reduce((a, b) => a + b, 0);
+        }
+
+        function isEndgame() {
+            return totalSeedsInPlay() <= 12;
+        }
+        
+        function calculateTempoAdvantage(moveIdx) {
+            const result = simulateMove(board, 2, moveIdx);
+            let freeTurnOps = 0;
+            if (result.nextPlayer === 2) freeTurnOps += 1;
+            
+            for (let i = 7; i <= 12; i++) {
+                if (result.board[i] > 0) {
+                     let seeds = result.board[i];
+                     let tempIdx = i;
+                     for(let k=0; k<seeds; k++) {
+                         tempIdx = (tempIdx + 1) % 14;
+                         if(tempIdx === P1_STORE) tempIdx = (tempIdx + 1) % 14;
+                     }
+                     if (tempIdx === P2_STORE) freeTurnOps++;
+                }
+            }
+            return freeTurnOps;
+        }
+
+        function getOpeningMove() {
+            if (board[12] === 1 && board[13] === 0) return 12; 
+            if (board[9] === 4) {
+                 let res = simulateMove(board, 2, 9);
+                 if (res.nextPlayer === 2) return 9;
+            }
+            return null;
+        }
+
+        function findBestEndgameMove(validMoves) {
+            let bestMove = -1;
+            let maxDiff = -Infinity;
+            
+            for (let move of validMoves) {
+                let res = simulateMove(board, 2, move);
+                let diff = res.board[P2_STORE] - res.board[P1_STORE];
+                if (diff > maxDiff) {
+                    maxDiff = diff;
+                    bestMove = move;
+                }
+            }
+            return bestMove;
+        }
+
+
+        /* ---------------- Expert AI Core ---------------- */
+        
+        function expertConditionalAI(validMoves) {
+            if (validMoves.length === 1) return validMoves[0];
+            
+            const totalMovesMade = historyStack.length;
+            if (totalMovesMade < 8) {
+                const openingMove = getOpeningMove();
+                if (openingMove !== null && validMoves.includes(openingMove)) return openingMove;
+            }
+            
+            if (isEndgame()) {
+                return findBestEndgameMove(validMoves);
+            }
+            
+            const scoredMoves = validMoves.map(move => {
+                let score = 0;
+                
+                score += board[move] * 0.1; 
+                
+                const result = simulateMove(board, 2, move);
+                
+                score += (result.board[13] - board[13]) * 3;
+                
+                if (result.nextPlayer === 2) {
+                    score += 5 + (48 - totalSeedsInPlay()) * 0.1;
+                }
+                
+                score += calculateTempoAdvantage(move) * 0.8;
+                
+                let opponentThreat = 0;
+                if (result.nextPlayer === 1) {
+                    for (let i = 0; i <= 5; i++) {
+                        if (result.board[i] > 0) {
+                            const oppResult = simulateMove(result.board, 1, i);
+                            let threat = oppResult.board[6] - result.board[6];
+                            if (oppResult.nextPlayer === 1) threat += 2;
+                            opponentThreat = Math.max(opponentThreat, threat);
+                        }
+                    }
+                }
+                score -= opponentThreat * 1.5;
+                
+                let futurePotential = 0;
+                for (let i = 7; i <= 12; i++) {
+                    if (result.board[i] === 0) {
+                        const opposite = 12 - i;
+                        if (opposite >= 0 && opposite <= 5 && result.board[opposite] > 0) {
+                            futurePotential += 2; 
+                        }
+                    }
+                }
+                score += futurePotential;
+                
+                const distToStore = 12 - move;
+                const positionMetric = distToStore / 5; 
+                
+                const gamePhase = totalSeedsInPlay() / 48; 
+                
+                if (gamePhase > 0.6) {
+                    score += positionMetric * 2; 
+                } else if (gamePhase < 0.4) {
+                    score += (1 - positionMetric) * 2;
+                }
+                
+                return { move, score };
+            });
+            
+            scoredMoves.sort((a, b) => b.score - a.score);
+            
+            if (scoredMoves.length >= 2 && scoredMoves[0].score > 0) {
+                const diff = scoredMoves[0].score - scoredMoves[1].score;
+                if (diff < (Math.abs(scoredMoves[0].score) * 0.1)) {
+                     return Math.random() < 0.6 ? scoredMoves[0].move : scoredMoves[1].move;
+                }
+            }
+            
+            return scoredMoves[0].move;
+        }
+
+        /* ---------------- Special AI (Minimax) Core ---------------- */
+
+        function getSpecialAIMove(initialBoard) {
+            // 使用 Minimax + Alpha-Beta 剪枝，深度 6
+            // 規則：若 P1 空，P2 的棋子歸 P2 計分洞。若 P2 空，P1 的棋子歸 P1 計分洞。
+            
+            const MAX_DEPTH = 6;
+
+            // 輔助：取得某玩家合法步
+            function getValidMovesForPlayer(boardState, player) {
+                const moves = [];
+                const start = player === 1 ? 0 : 7;
+                const end = player === 1 ? 5 : 12;
+                for (let i = start; i <= end; i++) {
+                    if (boardState[i] > 0) moves.push(i);
+                }
+                // 簡單排序優化：讓可能產生連鎖的步先搜，提高剪枝效率
+                moves.sort((a, b) => boardState[b] - boardState[a]); 
+                return moves;
+            }
+
+            // 輔助：評估函數
+            function evaluate(boardState) {
+                // 基本分數：(CPU分數 - 玩家分數)
+                return (boardState[P2_STORE] - boardState[P1_STORE]) * 100;
+            }
+            
+            // 輔助：檢查是否終局並計算最終分數 (包含清空邏輯)
+            function checkTerminalAndScore(boardState) {
+                let p1Empty = true;
+                let p2Empty = true;
+                for (let i = 0; i <= 5; i++) if (boardState[i] > 0) p1Empty = false;
+                for (let i = 7; i <= 12; i++) if (boardState[i] > 0) p2Empty = false;
+
+                if (p1Empty || p2Empty) {
+                    // 模擬終局清算：
+                    // 若一方空，則另一方所有剩餘棋子歸入該方自己的計分洞
+                    let tempBoard = [...boardState];
+                    for (let i = 0; i <= 5; i++) tempBoard[P1_STORE] += tempBoard[i]; // P1 剩的歸 P1
+                    for (let i = 7; i <= 12; i++) tempBoard[P2_STORE] += tempBoard[i]; // P2 剩的歸 P2
+                    
+                    // 回傳終局分數，並給予極大權重，確保 AI 重視勝利
+                    return (tempBoard[P2_STORE] - tempBoard[P1_STORE]) * 10000;
+                }
+                return null;
+            }
+
+            function minimax(boardState, depth, alpha, beta, isMaximizing) {
+                // 1. 每一步都先檢查是否已經終局 (一方全空)
+                const terminalScore = checkTerminalAndScore(boardState);
+                if (terminalScore !== null) return terminalScore;
+                
+                // 2. 若未終局但達到深度限制，回傳當前盤面評估
+                if (depth === 0) return evaluate(boardState);
+
+                if (isMaximizing) { // CPU (P2)
+                    let maxEval = -Infinity;
+                    const moves = getValidMovesForPlayer(boardState, 2);
+                    for (let move of moves) {
+                        const sim = simulateMove(boardState, 2, move);
+                        let eval;
+                        // 關鍵邏輯：如果是 free turn，深度不減
+                        if (sim.nextPlayer === 2) {
+                            eval = minimax(sim.board, depth, alpha, beta, true);
+                        } else {
+                            eval = minimax(sim.board, depth - 1, alpha, beta, false);
+                        }
+                        
+                        maxEval = Math.max(maxEval, eval);
+                        alpha = Math.max(alpha, eval);
+                        if (beta <= alpha) break; // Alpha-Beta Pruning
+                    }
+                    return maxEval;
+                } else { // Player (P1)
+                    let minEval = Infinity;
+                    const moves = getValidMovesForPlayer(boardState, 1);
+                    for (let move of moves) {
+                        const sim = simulateMove(boardState, 1, move);
+                        let eval;
+                        if (sim.nextPlayer === 1) {
+                            eval = minimax(sim.board, depth, alpha, beta, false);
+                        } else {
+                            eval = minimax(sim.board, depth - 1, alpha, beta, true);
+                        }
+                        
+                        minEval = Math.min(minEval, eval);
+                        beta = Math.min(beta, eval);
+                        if (beta <= alpha) break;
+                    }
+                    return minEval;
+                }
+            }
+
+            // 根節點搜尋
+            let bestMove = -1;
+            let bestValue = -Infinity;
+            const moves = getValidMovesForPlayer(initialBoard, 2);
+            let alpha = -Infinity;
+            let beta = Infinity;
+
+            for (let move of moves) {
+                const sim = simulateMove(initialBoard, 2, move);
+                
+                // 注意：即使是根節點的第一步模擬，也必須檢查是否導致終局
+                // 因為有可能這一步走完就清空了
+                let moveValue;
+                const rootTerminalScore = checkTerminalAndScore(sim.board);
+                
+                if (rootTerminalScore !== null) {
+                    moveValue = rootTerminalScore;
+                } else {
+                    if (sim.nextPlayer === 2) {
+                        moveValue = minimax(sim.board, MAX_DEPTH, alpha, beta, true);
+                    } else {
+                        moveValue = minimax(sim.board, MAX_DEPTH - 1, alpha, beta, false);
+                    }
+                }
+
+                if (moveValue > bestValue) {
+                    bestValue = moveValue;
+                    bestMove = move;
+                }
+                alpha = Math.max(alpha, bestValue);
+            }
+            
+            // 如果沒找到好步 (理論上不該發生)，隨機回傳
+            return bestMove !== -1 ? bestMove : moves[Math.floor(Math.random() * moves.length)];
+        }
+
+
+        /* ---------------- NPC Main Logic ---------------- */
+
+        function isBadDefense(moveIdx) {
+            let result = simulateMove(board, 2, moveIdx);
+            if (result.nextPlayer === 1) {
+                for(let i=0; i<=5; i++) {
+                    if (result.board[i] > 0) {
+                         let pResult = simulateMove(result.board, 1, i);
+                         if (pResult.board[6] - result.board[6] > 2) return true;
+                    }
+                }
+            }
+            return false;
+        }
+
+        function npcLogic() {
+            if (!gameActive || currentPlayer !== 2) return;
+            isAnimating = true;
+            updateControlsState();
+
+            // 如果是特別難度，使用 Minimax
+            if (activeGameDifficulty === 'special') {
+                const chosenMove = getSpecialAIMove(board);
+                isAnimating = false;
+                if (chosenMove !== -1) playTurn(chosenMove);
+                return;
+            }
+
+            const validMoves = [];
+            for (let i = 7; i <= 12; i++) {
+                if (board[i] > 0) validMoves.push(i);
+            }
+            
+            let chosenMove = -1;
+
+            if (validMoves.length > 0) {
+                if (activeGameDifficulty === 'expert') {
+                    chosenMove = expertConditionalAI(validMoves);
+                } 
+                else {
+                    for (let move of validMoves) {
+                        let sim = simulateMove(board, 2, move);
+                        if (sim.nextPlayer === 2) { 
+                            if (activeGameDifficulty === 'hard' && isBadDefense(move)) continue;
+                            chosenMove = move; 
+                            break; 
+                        }
+                    }
+
+                    if (chosenMove === -1 && activeGameDifficulty !== 'easy') {
+                        for (let move of validMoves) {
+                            let seeds = board[move];
+                            let simPos = move;
+                            for(let k=0; k<seeds; k++) {
+                                simPos = (simPos + 1) % 14;
+                                if (simPos === P1_STORE) simPos = (simPos + 1) % 14;
+                            }
+                            if (simPos >= 7 && simPos <= 12 && board[simPos] === 0 && simPos !== move) {
+                                let opp = 12 - simPos;
+                                if (board[opp] > 0) { 
+                                    if (activeGameDifficulty === 'hard' && isBadDefense(move)) continue;
+                                    chosenMove = move; 
+                                    break; 
+                                }
+                            }
+                        }
+                    }
+                    
+                    if (chosenMove === -1) {
+                        let pool = validMoves;
+                        if (activeGameDifficulty === 'hard') {
+                            let safeMoves = validMoves.filter(m => !isBadDefense(m));
+                            if (safeMoves.length > 0) pool = safeMoves;
+                        }
+                        
+                        let maxSeeds = -1;
+                        for (let move of pool) {
+                            if (board[move] > maxSeeds) { maxSeeds = board[move]; chosenMove = move; }
+                        }
+                    }
+                }
+            }
+            
+            isAnimating = false;
+            if (chosenMove !== -1) playTurn(chosenMove);
+        }
+
+       /* ---------------- Helpers ---------------- */
+
+       function highlightPit(index) {
+           const el = document.querySelector(`.pit[data-id="${index}"]`);
+           if(el) {
+               el.classList.add('capture-flash');
+               setTimeout(() => el.classList.remove('capture-flash'), 600);
+           }
+       }
+
+       function checkGameOver() {
+           let p1Empty = true;
+           let p2Empty = true;
+           for (let i = 0; i <= 5; i++) if (board[i] > 0) p1Empty = false;
+           for (let i = 7; i <= 12; i++) if (board[i] > 0) p2Empty = false;
+
+           if (p1Empty || p2Empty) {
+               gameActive = false;
+               endGameCleanup();
+           }
+       }
+
+       async function endGameCleanup() {
+           isAnimating = true;
+           updateControlsState();
+           updateClickableState(); // 清除呼吸燈
+           
+           // 結束提示
+           showMessage("遊戲結束", 3000, "移動剩下的棋子");
+
+           const animations = [];
+           const slowDuration = 1200; 
+           
+           for (let i = 0; i <= 5; i++) {
+               if (board[i] > 0) {
+                   animations.push(animateSeedTransfer(i, P1_STORE, slowDuration));
+                   board[P1_STORE] += board[i];
+                   board[i] = 0;
+               }
+           }
+           for (let i = 7; i <= 12; i++) {
+               if (board[i] > 0) {
+                   animations.push(animateSeedTransfer(i, P2_STORE, slowDuration));
+                   board[P2_STORE] += board[i];
+                   board[i] = 0;
+               }
+           }
+
+           if (animations.length > 0) await Promise.all(animations);
+
+           updateBoardUI();
+
+           let score1 = board[P1_STORE];
+           let score2 = board[P2_STORE];
+           let msg = "";
+           
+            if (score1 > score2) msg = "玩家 1 獲勝";
+            else if (score2 > score1) msg = (gameMode === 'pve' ? "電腦" : "玩家 2") + " 獲勝";
+            else msg = "平局";
+
+           await new Promise(r => setTimeout(r, 500));
+           showMessage(msg + `<br><div style="font-size:0.4em; margin-top:10px">${score1} - ${score2}</div>`, 6000);
+           
+           const turnDisplay = document.getElementById('turn-display');
+           turnDisplay.innerText = "遊戲結束";
+           turnDisplay.style.color = '#fff';
+           turnDisplay.style.borderColor = '#444';
+           turnDisplay.classList.remove('active');
+
+           isAnimating = false;
+           updateControlsState();
+       }
+
+       function updateBoardUI() {
+           for (let i = 0; i < TOTAL_PITS; i++) updatePitUI(i);
+       }
+
+       function updateTurnDisplay() {
+           const el = document.getElementById('turn-display');
+           if (!gameActive) return;
+           
+           let text = "";
+           let color = "";
+           if (currentPlayer === 1) {
+               text = "玩家 1 行動";
+               color = "var(--neon-1)";
+           } else {
+               text = "電腦思考中...";
+               if(gameMode === 'pvp') text = "玩家 2 行動";
+               color = "var(--neon-2)";
+           }
+           el.innerText = text;
+           el.style.color = color;
+           el.style.borderColor = color;
+       }
+
+       function updatePitUI(index) {
+           let el;
+           if (index === P1_STORE) el = document.getElementById('store-6');
+           else if (index === P2_STORE) el = document.getElementById('store-13');
+           else el = document.querySelector(`.pit[data-id="${index}"]`);
+           if (!el) return;
+           el.querySelector('.seed-count-badge').innerText = board[index];
+           const container = el.querySelector('.seeds-container');
+           container.innerHTML = '';
+           const visualCount = Math.min(board[index], 16); 
+           for (let k = 0; k < visualCount; k++) {
+               const seed = document.createElement('div');
+               seed.className = 'seed';
+               container.appendChild(seed);
+           }
+       }
+
+       // 新增：計算呼吸燈波浪效果的函數
+       // 使用負的 animationDelay 配合 Date.now()，確保無論何時加入 class，
+       // 動畫都會與全域時間同步，形成穩定的波浪，不會被 hover 或其他重繪重置。
+       function calculateWaveDelay(index) {
+           const cycleDuration = 2000; // 動畫週期 2秒
+           const now = Date.now();
+           
+           // 計算基礎偏移量 (波浪形狀)
+           let waveOffset = 0;
+           if (index <= 5) {
+               // P1: 左(0) -> 右(5)
+               waveOffset = (5 - index) * 300; 
+           } else {
+               // P2: 右(7) -> 左(12) 視覺上
+               waveOffset = (12 - index) * 300;
+           }
+
+           // 計算負延遲：讓動畫看起來已經運行了一段時間
+           // 公式：-( (當前時間 + 波浪偏移) % 週期 )
+           // 保證所有元素都對齊時間軸
+           const negativeDelay = -((now + waveOffset) % cycleDuration);
+           
+           return `${negativeDelay}ms`;
+       }
+
+       function updateClickableState() {
+           const p1Store = document.getElementById('store-6');
+           const p2Store = document.getElementById('store-13');
+           
+           // 清除所有坑洞的呼吸燈效果
+           document.querySelectorAll('.pit').forEach(p => {
+               p.classList.remove('active-turn-glow');
+               // 移除 inline style 避免干擾
+               p.style.animationDelay = ''; 
+           });
+
+           if (currentPlayer === 1 && gameActive) {
+               p1Store.classList.add('highlight-turn');
+               p2Store.classList.remove('highlight-turn');
+           } else if (currentPlayer === 2 && gameActive) {
+               p2Store.classList.add('highlight-turn');
+               p1Store.classList.remove('highlight-turn');
+           } else {
+               p1Store.classList.remove('highlight-turn');
+               p2Store.classList.remove('highlight-turn');
+           }
+
+           document.querySelectorAll('.pit').forEach(pit => {
+               pit.classList.remove('disabled');
+               pit.style.cursor = 'pointer';
+               pit.style.opacity = '1';
+               
+               const id = parseInt(pit.dataset.id);
+               const isP1Pit = id >= 0 && id <= 5;
+               const isP2Pit = id >= 7 && id <= 12;
+               
+               // 設定呼吸燈：使用新函數計算同步波浪
+               if (gameActive && !isAnimating) {
+                   if ((currentPlayer === 1 && isP1Pit) || (currentPlayer === 2 && isP2Pit)) {
+                       pit.classList.add('active-turn-glow');
+                       pit.style.animationDelay = calculateWaveDelay(id);
+                   }
+               }
+
+               if (isAnimating || !gameActive) {
+                   pit.classList.add('disabled');
+                   pit.style.cursor = 'default';
+               } else if (currentPlayer === 1 && !isP1Pit) {
+                   pit.classList.add('disabled');
+                   pit.style.cursor = 'not-allowed';
+               } else if (currentPlayer === 2 && !isP2Pit) {
+                   pit.classList.add('disabled');
+                   pit.style.cursor = 'not-allowed';
+               }
+           });
+       }
+
+       function animateSeedTransfer(fromIdx, toIdx, duration = 300) {
+           return new Promise(resolve => {
+               const fromEl = getElementByIndex(fromIdx);
+               const toEl = getElementByIndex(toIdx);
+               if (!fromEl || !toEl) { resolve(); return; }
+
+               const rect1 = fromEl.getBoundingClientRect();
+               const rect2 = toEl.getBoundingClientRect();
+
+               const flying = document.createElement('div');
+               flying.className = 'flying-seed';
+               
+               const colors = ['var(--neon-1)', 'var(--neon-2)', 'var(--neon-3)'];
+               const randColor = colors[Math.floor(Math.random() * colors.length)];
+               flying.style.backgroundColor = randColor;
+               flying.style.boxShadow = `0 0 10px ${randColor}`;
+               
+               // 設定動畫時間
+               flying.style.transition = `all ${duration}ms cubic-bezier(0.25, 0.46, 0.45, 0.94)`;
+
+               const startX = rect1.left + rect1.width/2 - 7;
+               const startY = rect1.top + rect1.height/2 - 7;
+               
+               flying.style.left = startX + 'px';
+               flying.style.top = startY + 'px';
+
+               document.body.appendChild(flying);
+               flying.getBoundingClientRect();
+
+               flying.style.left = (rect2.left + rect2.width/2 - 7) + 'px';
+               flying.style.top = (rect2.top + rect2.height/2 - 7) + 'px';
+
+               setTimeout(() => {
+                   flying.remove();
+                   resolve();
+               }, duration);
+           });
+       }
+
+       function getElementByIndex(index) {
+           if (index === P1_STORE) return document.getElementById('store-6');
+           if (index === P2_STORE) return document.getElementById('store-13');
+           return document.querySelector(`.pit[data-id="${index}"]`);
+       }
+
+       let msgTimeout;
+       function showMessage(text, duration, subtitle = "") {
+           const el = document.getElementById('center-message');
+           
+           let content = text;
+           if (subtitle) {
+               content += `<div style="font-size: 0.4em; margin-top: 15px; color: #ccc; font-weight: normal; letter-spacing: 1px;">${subtitle}</div>`;
+           }
+           
+           el.innerHTML = content;
+           el.style.opacity = 1;
+           clearTimeout(msgTimeout);
+           if (duration > 0) {
+               msgTimeout = setTimeout(() => {
+                   el.style.opacity = 0;
+               }, duration);
+           }
+       }
+
+       function toggleRules() {
+           const modal = document.getElementById('rules-modal');
+           modal.style.display = modal.style.display === 'flex' ? 'none' : 'flex';
+       }
+
+       function hideNpcBubble() {
+           const bubble = document.getElementById('npc-bubble');
+           bubble.classList.remove('visible');
+       }
+
+       init();
+   </script>
+</body>
+</html>
