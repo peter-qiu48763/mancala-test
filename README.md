@@ -39,7 +39,8 @@
 ##  快速開始
 
 ### 線上試玩
-可直接在 GitHub Pages 或任何靜態託管服務上運行。
+可直接在 GitHub Pages 上運行。
+點擊[此連結](https://peter-qiu48763.github.io/mancala-test/index.html)立即試玩。
 
 ### 本地運行
 1. 下載專案檔案（`index.html`、`manifest.json`、`sw.js`、`icon-192.png`）
