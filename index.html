@@ -15,7 +15,7 @@
 
    <meta charset="UTF-8">
    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-   <title>播棋 Mancala Pro</title>
+   <title>播棋 Mancala</title>
    <style>
        :root {
            --bg-color: #121212;
@@ -112,6 +112,29 @@
            background: rgba(0,0,0,0.2);
            box-shadow: none;
            border-color: #333;
+       }
+       
+       /* 教學按鈕樣式 */
+       .btn-tutorial {
+           background: linear-gradient(135deg, var(--neon-1) 0%, #2979FF 100%);
+           border: none;
+           color: #fff;
+           font-weight: 800;
+           width: 100%;
+           margin-top: 15px;
+           padding: 15px;
+       }
+       .btn-tutorial:hover:not(:disabled) {
+           background: linear-gradient(135deg, #40c4ff 0%, #448aff 100%);
+           transform: translateY(-2px);
+           box-shadow: 0 0 20px rgba(0, 229, 255, 0.4);
+       }
+       .btn-tutorial:disabled {
+           background: #444;
+           color: #888;
+           box-shadow: none;
+           cursor: not-allowed;
+           transform: none;
        }
 
        /* 下拉選單樣式優化 */
@@ -238,6 +261,14 @@
        .pit.active-turn-glow {
            animation: breathing-glow 2s infinite ease-in-out;
            z-index: 5;
+       }
+       
+       /* 教學模式指引 */
+       .pit.tutorial-target {
+           animation: breathing-glow 1s infinite ease-in-out !important;
+           border-color: var(--neon-3) !important;
+           box-shadow: 0 0 20px var(--neon-3) !important;
+           z-index: 100;
        }
 
        .pit:hover:not(.disabled) {
@@ -392,6 +423,23 @@
            position: relative;
            color: #ddd;
            text-align: center;
+           /* 捲動設定 */
+           max-height: 80vh;
+           overflow-y: auto;
+           scrollbar-width: thin;
+           scrollbar-color: #555 #222;
+       }
+
+       .modal-content::-webkit-scrollbar {
+           width: 8px;
+       }
+       .modal-content::-webkit-scrollbar-track {
+           background: #222;
+           border-radius: 4px;
+       }
+       .modal-content::-webkit-scrollbar-thumb {
+           background: #555;
+           border-radius: 4px;
        }
 
        .modal h2 {
@@ -401,6 +449,11 @@
            padding-bottom: 15px;
            margin-bottom: 20px;
            text-align: left;
+           position: sticky;
+           top: -35px; /* 抵銷 padding */
+           background: #252525;
+           z-index: 10;
+           padding-top: 10px;
        }
        
        .modal-content.centered-text h2 {
@@ -415,6 +468,7 @@
            cursor: pointer;
            color: #888;
            transition: color 0.2s;
+           z-index: 20;
        }
        .close-btn:hover { color: #fff; }
        
@@ -428,6 +482,20 @@
        .selection-btn-container .btn {
            min-width: 120px;
            font-size: 1.1rem;
+       }
+
+       /* 規則列表樣式 */
+       .rules-list {
+           text-align: left;
+           line-height: 1.6;
+           padding-left: 20px;
+           margin-bottom: 25px;
+       }
+       .rules-list li {
+           margin-bottom: 10px;
+       }
+       .rules-list strong {
+           color: var(--neon-3);
        }
 
        @media (max-width: 1024px) {
@@ -449,8 +517,9 @@
            .seed { width: 6px; height: 6px; }
            .seed-count-badge { width: 18px; height: 18px; font-size: 0.7rem; }
            .btn { padding: 8px 12px; font-size: 0.85rem; border-radius: 10px; }
-           #center-message { font-size: 2rem; white-space: normal; width: 90%; }
+           #center-message { font-size: 1.8rem; white-space: normal; width: 90%; line-height: 1.3; }
            .ai-bubble { top: auto; bottom: 110%; left: 0; transform: none; width: 150px; }
+           .modal-content { padding: 25px; width: 85%; }
        }
    </style>
 </head>
@@ -535,19 +604,26 @@
        <div id="center-message"></div>
    </div>
 
-   <!-- 規則彈窗 -->
+   <!-- 規則與教學彈窗 -->
    <div id="rules-modal" class="modal">
        <div class="modal-content">
            <span class="close-btn" onclick="toggleRules()">×</span>
            <h2>📖 播棋 (Mancala) 規則</h2>
-           <p><strong>目標：</strong> 遊戲結束時，己方計分洞（大洞）內的棋子比對手多。</p>
-           <ul>
-               <li><strong>移動：</strong> 點擊己方小洞，取出所有棋子，逆時針依序播撒。</li>
-               <li><strong>計分洞：</strong> 經過自己計分洞時會放入一顆，經過對手的則跳過。</li>
-               <li><strong>再來一次：</strong> 最後一顆落入自己的計分洞，可額外獲得一回合。</li>
-               <li><strong>捕獲：</strong> 最後一顆落入己方空洞且對面有棋子，兩邊棋子都放入大洞。</li>
-               <li><strong>結束：</strong> 一方清空所有小洞時結束，對手剩餘棋子歸對手所有。</li>
-           </ul>
+           <div style="text-align: left;">
+               <p><strong>目標：</strong> 遊戲結束時，己方計分洞（大洞）內的棋子比對手多。</p>
+               <ul class="rules-list">
+                   <li><strong>移動：</strong> 點擊己方小洞，取出所有棋子，逆時針依序播撒。</li>
+                   <li><strong>計分洞：</strong> 經過自己計分洞時會放入一顆，經過對手的則跳過。</li>
+                   <li><strong>再來一次：</strong> 最後一顆落入自己的計分洞，可額外獲得一回合。</li>
+                   <li><strong>捕獲：</strong> 最後一顆落入己方空洞且對面有棋子，兩邊棋子都放入大洞。</li>
+                   <li><strong>結束：</strong> 一方清空所有小洞時結束，對手剩餘棋子歸對手所有。</li>
+               </ul>
+           </div>
+           
+           <hr style="border: 0; border-top: 1px solid #444; margin: 20px 0;">
+           
+           <p style="color: #ccc; font-size: 0.9em; margin-bottom: 15px;">還不熟悉規則嗎？試試看教學！</p>
+           <button id="start-tutorial-btn" class="btn btn-tutorial" onclick="startTutorial()">🎓 開始教學模式</button>
        </div>
    </div>
 
@@ -573,11 +649,15 @@
        let currentPlayer = 1;
        let gameActive = false;
        let isAnimating = false;
-       let gameMode = 'pve';
+       let gameMode = 'pve'; // pve, pvp, tutorial
        let aiDifficulty = 'normal';
-       // 追蹤實際難度，取消選擇時復原
        let activeGameDifficulty = 'normal';
        let historyStack = [];
+       
+       // 教學模式變數
+       let tutorialStep = 0;
+       let tutorialTarget = -1; // 當前允許點擊的坑洞
+       let tutorialPhase = null; // 用於管理教學步驟內的子狀態
 
        function init() {
            document.querySelectorAll('.pit').forEach(pit => {
@@ -592,11 +672,11 @@
            const val = select.value;
            let color = '#fff';
            
-           if (val === 'easy') color = '#2979FF';        // 藍色
-           else if (val === 'normal') color = '#0be00f'; // 綠色
-           else if (val === 'hard') color = '#FFC107';   // 橘黃色
-           else if (val === 'expert') color = '#FF5252'; // 紅色
-           else if (val === 'special') color = '#FF4081'; // 桃紅色
+           if (val === 'easy') color = '#2979FF';
+           else if (val === 'normal') color = '#0be00f';
+           else if (val === 'hard') color = '#FFC107';
+           else if (val === 'expert') color = '#FF5252';
+           else if (val === 'special') color = '#FF4081';
            
            select.style.color = color;
        }
@@ -611,32 +691,121 @@
 
            if (gameMode === 'pve') {
                document.getElementById('turn-selection-modal').style.display = 'flex';
-               updateControlsState(); // 更新按鈕狀態
+               updateControlsState(); 
            } else {
                const randomStarter = Math.random() < 0.5 ? 1 : 2;
                startGameWithPlayer(randomStarter);
            }
        }
 
-       // 關閉先手選擇時，復原難度設定
        function closeTurnSelection() {
            document.getElementById('turn-selection-modal').style.display = 'none';
-           
-           // 如果只換難度但沒開始，將 UI 復原成實際難度
-           const diffSelector = document.getElementById('difficulty-select');
-           if (diffSelector.value !== activeGameDifficulty) {
-               diffSelector.value = activeGameDifficulty;
-               aiDifficulty = activeGameDifficulty; // 確保邏輯變數也復原
+           if (document.getElementById('difficulty-select').value !== activeGameDifficulty) {
+               document.getElementById('difficulty-select').value = activeGameDifficulty;
+               aiDifficulty = activeGameDifficulty;
                updateDifficultyStyle();
            }
        }
+       
+       /* -------------- 教學模式邏輯 -------------- */
+       
+       function startTutorial() {
+           if (isAnimating) return; // 防呆
+           
+           toggleRules(); // 關閉規則窗
+           gameMode = 'tutorial';
+           tutorialStep = 1;
+           tutorialPhase = null;
+           gameActive = true;
+           isAnimating = false;
+           currentPlayer = 1;
+           historyStack = [];
+           
+           // UI 設定
+           document.getElementById('label-p1').innerText = "你";
+           document.getElementById('label-p2').innerText = "電腦";
+           document.getElementById('turn-display').innerText = "教學模式";
+           document.getElementById('turn-display').style.color = "var(--neon-3)";
+           
+           setupTutorialStep(1);
+           updateControlsState();
+       }
+       
+       function setupTutorialStep(step) {
+           tutorialStep = step;
+           currentPlayer = 1; // 確保每個步驟都由玩家開始
+           tutorialPhase = null;
+
+           if (step === 1) {
+               // 步驟 1: 基礎播棋
+               board = Array(TOTAL_PITS).fill(0);
+               board[2] = 5; 
+               // 裝飾用，避免太單調
+               board[0] = 1; board[1] = 2;
+               board[8] = 2; board[9] = 2;
+               
+               tutorialTarget = 2;
+               showMessage("課程 1：播棋", 3000, "點擊己方坑洞，棋子將逆時針依序播撒（會略過對手的計分洞）");
+           } else if (step === 2) {
+               // 步驟 2: 再來一次 (Free Turn)
+               board = Array(TOTAL_PITS).fill(1); // 全填1
+               board[P1_STORE] = 2; // 先給一點分
+               board[P2_STORE] = 2;
+               board[5] = 1; // 目標
+               board[7] = 0; 
+               
+               tutorialTarget = 5;
+               showMessage("課程 2：再來一次", 3000, "若最後一顆落在計分洞，可再行動一次");
+           } else if (step === 3) {
+               // 步驟 3: 捕獲 (Capture)
+               board = Array(TOTAL_PITS).fill(2); // 背景雜訊
+               board[P1_STORE] = 5; 
+               board[P2_STORE] = 5;
+               board[0] = 1; // 目標
+               board[1] = 0; // 落點 (空)
+               board[11] = 5; // 被捕獲對象
+               
+               tutorialTarget = 0;
+               showMessage("課程 3：捕獲", 3000, "落在己方空洞時可捕獲對面棋子");
+           } else if (step === 4) {
+               // 步驟 4: 結束遊戲
+               board = Array(TOTAL_PITS).fill(0);
+               board[5] = 1;
+               // 對手有很多棋子，展示結算時歸對方
+               for(let i=7; i<=12; i++) board[i] = 3;
+               board[P1_STORE] = 10;
+               board[P2_STORE] = 10;
+               
+               tutorialTarget = 5;
+               showMessage("課程 4：結束遊戲", 3000, "一方清空時遊戲結束，對手剩餘棋子歸對手");
+           }
+           
+           updateBoardUI();
+           updateClickableState();
+           updateTurnDisplay();
+       }
+
+       function nextTutorialStep() {
+           tutorialStep++;
+           if (tutorialStep > 4) {
+               showMessage("教學完成", 2000, "現在開始正式遊戲");
+               setTimeout(() => {
+                   document.getElementById('mode-select').value = 'pve';
+                   prepareGame();
+               }, 2000);
+           } else {
+               setTimeout(() => {
+                   setupTutorialStep(tutorialStep);
+               }, 1500);
+           }
+       }
+
+       /* -------------- 遊戲核心 -------------- */
 
        function startGameWithPlayer(starter) {
-           if (isAnimating) return; // 動畫中禁止開始
+           if (isAnimating) return;
 
            document.getElementById('turn-selection-modal').style.display = 'none';
-           
-           // 確保難度已更新
            activeGameDifficulty = aiDifficulty;
 
            board = Array(TOTAL_PITS).fill(INITIAL_SEEDS);
@@ -661,6 +830,7 @@
            document.getElementById('label-p2').innerText = npcName;
            
            const turnDisplay = document.getElementById('turn-display');
+           turnDisplay.innerText = "遊戲準備中"; // 重置文字
            turnDisplay.classList.add('active');
 
            updateBoardUI();
@@ -684,13 +854,14 @@
        }
 
        function saveState() {
+           if (gameMode === 'tutorial') return; // 教學不紀錄
            const state = JSON.stringify({ board: board, currentPlayer: currentPlayer });
            historyStack.push(state);
            updateControlsState();
        }
 
        function undoMove() {
-           if (isAnimating || !gameActive || historyStack.length === 0) return;
+           if (isAnimating || !gameActive || historyStack.length === 0 || gameMode === 'tutorial') return;
 
            const previousState = JSON.parse(historyStack.pop());
            board = previousState.board;
@@ -708,19 +879,55 @@
            const resetBtn = document.getElementById('reset-btn');
            const modeSelect = document.getElementById('mode-select');
            const diffSelect = document.getElementById('difficulty-select');
-           
-           // 先手選擇跳窗內的按鈕
            const turnSelectionBtns = document.querySelectorAll('#turn-selection-modal .btn');
+           const tutorialBtn = document.getElementById('start-tutorial-btn');
 
-           if (isAnimating) {
+           // 動畫中禁用教學按鈕
+           if (tutorialBtn) tutorialBtn.disabled = isAnimating;
+
+           if (isAnimating || gameMode === 'tutorial') {
                undoBtn.disabled = true;
                resetBtn.disabled = true;
                modeSelect.disabled = true;
                diffSelect.disabled = true;
                turnSelectionBtns.forEach(btn => btn.disabled = true);
+               
+               // 教學模式下允許重置按鈕作為「退出教學」
+               if (gameMode === 'tutorial' && !isAnimating) {
+                   resetBtn.disabled = false;
+                   resetBtn.querySelector('span').innerText = "退出";
+                   resetBtn.onclick = () => {
+                       // 退出時清空棋盤並停止遊戲
+                       resetBtn.querySelector('span').innerText = "重置";
+                       resetBtn.onclick = prepareGame;
+                       
+                       gameMode = 'pve';
+                       document.getElementById('mode-select').value = 'pve';
+                       
+                       // 清空棋盤 (全0)
+                       board = Array(TOTAL_PITS).fill(0);
+                       currentPlayer = 1;
+                       gameActive = false;
+                       historyStack = [];
+                       
+                       // 恢復 UI 狀態
+                       const turnDisplay = document.getElementById('turn-display');
+                       turnDisplay.innerText = "遊戲準備中";
+                       turnDisplay.style.color = "#fff";
+                       turnDisplay.style.borderColor = "#444";
+                       
+                       updateBoardUI();
+                       updateControlsState();
+                       updateClickableState(); 
+                       
+                       showMessage("已退出教學", 1500);
+                   };
+               }
            } else {
                undoBtn.disabled = historyStack.length === 0 || !gameActive;
-               resetBtn.disabled = false; 
+               resetBtn.disabled = false;
+               resetBtn.querySelector('span').innerText = "重置";
+               resetBtn.onclick = prepareGame;
                modeSelect.disabled = false;
                diffSelect.disabled = false;
                turnSelectionBtns.forEach(btn => btn.disabled = false);
@@ -730,10 +937,23 @@
        function handlePitClick(index) {
            if (!gameActive || isAnimating) return;
            
-           // PVE禁止玩家點擊 (7-12)
-           if (gameMode === 'pve' && index >= 7 && index <= 12) {
-               return;
+           // 教學模式特殊處理
+           if (gameMode === 'tutorial') {
+               if (tutorialPhase === 'free_move') {
+                   // 自由行動階段，允許玩家點擊任意己方非空洞
+                   if (index < 0 || index > 5 || board[index] === 0) {
+                       // 這裡不需要顯示錯誤，標準邏輯會擋掉
+                       if (board[index] === 0 && index >= 0 && index <= 5) showMessage("不可選擇空洞", 800);
+                       return;
+                   }
+               } else if (index !== tutorialTarget) {
+                   showMessage("請點擊亮起的洞", 1000);
+                   return;
+               }
            }
+           
+           // PVE禁止玩家點擊 (7-12)
+           if (gameMode === 'pve' && index >= 7 && index <= 12) return;
 
            if (currentPlayer === 1 && (index < 0 || index > 5)) return;
            if (currentPlayer === 2 && (index < 7 || index > 12)) return;
@@ -748,6 +968,7 @@
        }
 
        async function playTurn(startIndex) {
+           const currentPhase = tutorialPhase; // 記錄當前階段
            isAnimating = true;
            updateClickableState(); 
            updateControlsState(); 
@@ -760,6 +981,7 @@
            
            for (let i = 0; i < seeds; i++) {
                currentIndex = (currentIndex + 1) % TOTAL_PITS;
+               // 跳過對手計分洞
                if (currentPlayer === 1 && currentIndex === P2_STORE) {
                    currentIndex = (currentIndex + 1) % TOTAL_PITS;
                } else if (currentPlayer === 2 && currentIndex === P1_STORE) {
@@ -771,7 +993,7 @@
                updatePitUI(currentIndex);
            }
 
-           // 捕獲
+           // 捕獲邏輯
            let captured = false;
            const isMySide = (currentPlayer === 1 && currentIndex >= 0 && currentIndex <= 5) ||
                             (currentPlayer === 2 && currentIndex >= 7 && currentIndex <= 12);
@@ -806,11 +1028,34 @@
            const landedInStore = (currentPlayer === 1 && currentIndex === P1_STORE) ||
                                  (currentPlayer === 2 && currentIndex === P2_STORE);
 
-           checkGameOver();
+           // 檢查遊戲結束 (使用布林值判定，不在此處直接呼叫 cleanup)
+           const isGameOver = checkGameOverCondition();
+
+           if (isGameOver) {
+               gameActive = false;
+               await endGameCleanup(); // 等待結算動畫完成
+               
+               // 教學模式：課程 4 結算完後延遲結束
+               if (gameMode === 'tutorial' && tutorialStep === 4) {
+                   setTimeout(nextTutorialStep, 2500);
+               }
+               return; // 遊戲結束，終止後續邏輯
+           }
 
            if (gameActive) {
                if (landedInStore) {
-                   showMessage("再來一次", 1000, "最後一顆落入計分洞");
+                   // 教學模式課程 2 特殊處理
+                   if (gameMode === 'tutorial' && tutorialStep === 2 && currentPhase !== 'free_move') {
+                       showMessage("再來一次", 2000, "最後一顆落入計分洞，獲得額外回合");
+                       tutorialPhase = 'free_move';
+                       
+                       isAnimating = false;
+                       updateClickableState(); // 更新高亮狀態 (全體)
+                       updateControlsState();
+                       return; // 不切換回合，等待玩家再次行動
+                   } else {
+                       showMessage("再來一次", 1000, "最後一顆落入計分洞");
+                   }
                } else {
                    currentPlayer = currentPlayer === 1 ? 2 : 1;
                }
@@ -819,8 +1064,16 @@
                isAnimating = false;
                updateClickableState();
                updateControlsState(); 
-
-               if (gameMode === 'pve' && currentPlayer === 2 && gameActive) {
+               
+               if (gameMode === 'tutorial') {
+                   // 如果處於自由行動階段結束
+                   if (tutorialStep === 2 && currentPhase === 'free_move') {
+                       tutorialPhase = null;
+                       nextTutorialStep();
+                   } else if (tutorialStep === 1 || tutorialStep === 3) {
+                       nextTutorialStep();
+                   }
+               } else if (gameMode === 'pve' && currentPlayer === 2 && gameActive) {
                    setTimeout(npcLogic, 1000);
                }
            } else {
@@ -829,7 +1082,7 @@
            }
        }
 
-        /* ---------------- AI Helpers ---------------- */
+       /* ---------------- AI Helpers ---------------- */
 
         function simulateMove(currentBoard, player, moveIdx) {
             let simBoard = [...currentBoard];
@@ -1001,12 +1254,8 @@
         /* ---------------- Special AI (Minimax) Core ---------------- */
 
         function getSpecialAIMove(initialBoard) {
-            // 使用 Minimax + Alpha-Beta 剪枝，深度 6
-            // 規則：若 P1 空，P2 的棋子歸 P2 計分洞。若 P2 空，P1 的棋子歸 P1 計分洞。
-            
             const MAX_DEPTH = 6;
 
-            // 輔助：取得某玩家合法步
             function getValidMovesForPlayer(boardState, player) {
                 const moves = [];
                 const start = player === 1 ? 0 : 7;
@@ -1014,18 +1263,14 @@
                 for (let i = start; i <= end; i++) {
                     if (boardState[i] > 0) moves.push(i);
                 }
-                // 簡單排序優化：讓可能產生連鎖的步先搜，提高剪枝效率
                 moves.sort((a, b) => boardState[b] - boardState[a]); 
                 return moves;
             }
 
-            // 輔助：評估函數
             function evaluate(boardState) {
-                // 基本分數：(CPU分數 - 玩家分數)
                 return (boardState[P2_STORE] - boardState[P1_STORE]) * 100;
             }
             
-            // 輔助：檢查是否終局並計算最終分數 (包含清空邏輯)
             function checkTerminalAndScore(boardState) {
                 let p1Empty = true;
                 let p2Empty = true;
@@ -1033,33 +1278,27 @@
                 for (let i = 7; i <= 12; i++) if (boardState[i] > 0) p2Empty = false;
 
                 if (p1Empty || p2Empty) {
-                    // 模擬終局清算：
-                    // 若一方空，則另一方所有剩餘棋子歸入該方自己的計分洞
                     let tempBoard = [...boardState];
-                    for (let i = 0; i <= 5; i++) tempBoard[P1_STORE] += tempBoard[i]; // P1 剩的歸 P1
-                    for (let i = 7; i <= 12; i++) tempBoard[P2_STORE] += tempBoard[i]; // P2 剩的歸 P2
+                    for (let i = 0; i <= 5; i++) tempBoard[P1_STORE] += tempBoard[i];
+                    for (let i = 7; i <= 12; i++) tempBoard[P2_STORE] += tempBoard[i];
                     
-                    // 回傳終局分數，並給予極大權重，確保 AI 重視勝利
                     return (tempBoard[P2_STORE] - tempBoard[P1_STORE]) * 10000;
                 }
                 return null;
             }
 
             function minimax(boardState, depth, alpha, beta, isMaximizing) {
-                // 1. 每一步都先檢查是否已經終局 (一方全空)
                 const terminalScore = checkTerminalAndScore(boardState);
                 if (terminalScore !== null) return terminalScore;
                 
-                // 2. 若未終局但達到深度限制，回傳當前盤面評估
                 if (depth === 0) return evaluate(boardState);
 
-                if (isMaximizing) { // CPU (P2)
+                if (isMaximizing) { 
                     let maxEval = -Infinity;
                     const moves = getValidMovesForPlayer(boardState, 2);
                     for (let move of moves) {
                         const sim = simulateMove(boardState, 2, move);
                         let eval;
-                        // 關鍵邏輯：如果是 free turn，深度不減
                         if (sim.nextPlayer === 2) {
                             eval = minimax(sim.board, depth, alpha, beta, true);
                         } else {
@@ -1068,10 +1307,10 @@
                         
                         maxEval = Math.max(maxEval, eval);
                         alpha = Math.max(alpha, eval);
-                        if (beta <= alpha) break; // Alpha-Beta Pruning
+                        if (beta <= alpha) break; 
                     }
                     return maxEval;
-                } else { // Player (P1)
+                } else { 
                     let minEval = Infinity;
                     const moves = getValidMovesForPlayer(boardState, 1);
                     for (let move of moves) {
@@ -1091,7 +1330,6 @@
                 }
             }
 
-            // 根節點搜尋
             let bestMove = -1;
             let bestValue = -Infinity;
             const moves = getValidMovesForPlayer(initialBoard, 2);
@@ -1100,9 +1338,6 @@
 
             for (let move of moves) {
                 const sim = simulateMove(initialBoard, 2, move);
-                
-                // 注意：即使是根節點的第一步模擬，也必須檢查是否導致終局
-                // 因為有可能這一步走完就清空了
                 let moveValue;
                 const rootTerminalScore = checkTerminalAndScore(sim.board);
                 
@@ -1123,7 +1358,6 @@
                 alpha = Math.max(alpha, bestValue);
             }
             
-            // 如果沒找到好步 (理論上不該發生)，隨機回傳
             return bestMove !== -1 ? bestMove : moves[Math.floor(Math.random() * moves.length)];
         }
 
@@ -1148,7 +1382,6 @@
             isAnimating = true;
             updateControlsState();
 
-            // 如果是特別難度，使用 Minimax
             if (activeGameDifficulty === 'special') {
                 const chosenMove = getSpecialAIMove(board);
                 isAnimating = false;
@@ -1225,25 +1458,24 @@
            }
        }
 
-       function checkGameOver() {
+       // 僅檢查條件，不直接觸發結束邏輯
+       function checkGameOverCondition() {
            let p1Empty = true;
            let p2Empty = true;
            for (let i = 0; i <= 5; i++) if (board[i] > 0) p1Empty = false;
            for (let i = 7; i <= 12; i++) if (board[i] > 0) p2Empty = false;
-
-           if (p1Empty || p2Empty) {
-               gameActive = false;
-               endGameCleanup();
-           }
+           return p1Empty || p2Empty;
        }
 
        async function endGameCleanup() {
            isAnimating = true;
            updateControlsState();
-           updateClickableState(); // 清除呼吸燈
+           updateClickableState(); 
            
-           // 結束提示
-           showMessage("遊戲結束", 3000, "移動剩下的棋子");
+           // 修復：如果是教學模式第四關，也顯示結束遊戲提示
+           if (gameMode !== 'tutorial' || (gameMode === 'tutorial' && tutorialStep === 4)) {
+               showMessage("遊戲結束", 3000, "移動剩下的棋子");
+           }
 
            const animations = [];
            const slowDuration = 1200; 
@@ -1266,6 +1498,13 @@
            if (animations.length > 0) await Promise.all(animations);
 
            updateBoardUI();
+
+           if (gameMode === 'tutorial') {
+                // 教學模式結束後，將動畫狀態設為false，避免按鈕鎖死
+                isAnimating = false;
+                updateControlsState();
+                return;
+           }
 
            let score1 = board[P1_STORE];
            let score2 = board[P2_STORE];
@@ -1296,6 +1535,13 @@
            const el = document.getElementById('turn-display');
            if (!gameActive) return;
            
+           if (gameMode === 'tutorial') {
+                el.innerText = `教學課程 ${tutorialStep}/4`;
+                el.style.color = 'var(--neon-3)';
+                el.style.borderColor = 'var(--neon-3)';
+                return;
+           }
+
            let text = "";
            let color = "";
            if (currentPlayer === 1) {
@@ -1328,28 +1574,16 @@
            }
        }
 
-       // 新增：計算呼吸燈波浪效果的函數
-       // 使用負的 animationDelay 配合 Date.now()，確保無論何時加入 class，
-       // 動畫都會與全域時間同步，形成穩定的波浪，不會被 hover 或其他重繪重置。
        function calculateWaveDelay(index) {
-           const cycleDuration = 2000; // 動畫週期 2秒
+           const cycleDuration = 2000; 
            const now = Date.now();
-           
-           // 計算基礎偏移量 (波浪形狀)
            let waveOffset = 0;
            if (index <= 5) {
-               // P1: 左(0) -> 右(5)
                waveOffset = (5 - index) * 300; 
            } else {
-               // P2: 右(7) -> 左(12) 視覺上
                waveOffset = (12 - index) * 300;
            }
-
-           // 計算負延遲：讓動畫看起來已經運行了一段時間
-           // 公式：-( (當前時間 + 波浪偏移) % 週期 )
-           // 保證所有元素都對齊時間軸
            const negativeDelay = -((now + waveOffset) % cycleDuration);
-           
            return `${negativeDelay}ms`;
        }
 
@@ -1357,10 +1591,9 @@
            const p1Store = document.getElementById('store-6');
            const p2Store = document.getElementById('store-13');
            
-           // 清除所有坑洞的呼吸燈效果
            document.querySelectorAll('.pit').forEach(p => {
                p.classList.remove('active-turn-glow');
-               // 移除 inline style 避免干擾
+               p.classList.remove('tutorial-target');
                p.style.animationDelay = ''; 
            });
 
@@ -1384,11 +1617,24 @@
                const isP1Pit = id >= 0 && id <= 5;
                const isP2Pit = id >= 7 && id <= 12;
                
-               // 設定呼吸燈：使用新函數計算同步波浪
+               // 設定呼吸燈
                if (gameActive && !isAnimating) {
                    if ((currentPlayer === 1 && isP1Pit) || (currentPlayer === 2 && isP2Pit)) {
                        pit.classList.add('active-turn-glow');
                        pit.style.animationDelay = calculateWaveDelay(id);
+                   }
+                   
+                   // 教學模式：強力高亮目標
+                   if (gameMode === 'tutorial') {
+                       if (tutorialPhase === 'free_move') {
+                            // 自由行動：高亮所有可點擊的己方洞
+                            if (id >= 0 && id <= 5 && board[id] > 0) {
+                                pit.classList.add('active-turn-glow');
+                            }
+                       } else if (id === tutorialTarget) {
+                           pit.classList.add('tutorial-target');
+                           pit.classList.remove('active-turn-glow'); 
+                       }
                    }
                }
 
@@ -1401,6 +1647,17 @@
                } else if (currentPlayer === 2 && !isP2Pit) {
                    pit.classList.add('disabled');
                    pit.style.cursor = 'not-allowed';
+               }
+               
+               // 教學模式：非目標全部禁用
+               if (gameMode === 'tutorial' && !pit.classList.contains('disabled')) {
+                   if (tutorialPhase === 'free_move') {
+                       // 自由行動：允許所有己方非空洞，無需禁用
+                   } else if (id !== tutorialTarget) {
+                       pit.classList.add('disabled');
+                       pit.style.cursor = 'not-allowed';
+                       pit.style.opacity = '0.4';
+                   }
                }
            });
        }
@@ -1422,7 +1679,6 @@
                flying.style.backgroundColor = randColor;
                flying.style.boxShadow = `0 0 10px ${randColor}`;
                
-               // 設定動畫時間
                flying.style.transition = `all ${duration}ms cubic-bezier(0.25, 0.46, 0.45, 0.94)`;
 
                const startX = rect1.left + rect1.width/2 - 7;
