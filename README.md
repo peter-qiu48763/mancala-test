@@ -105,6 +105,98 @@ mancala-test/
 └── README.md          # 本說明文件
 ```
 
+```mermaid
+graph LR
+    A[專案] --> B[HTML 結構]
+    A --> C[CSS 樣式]
+    A --> D[JavaScript 邏輯]
+    A --> E[PWA 功能]
+    
+    B --> B1[head 標籤]
+    B --> B2[body 標籤]
+    
+    B1 --> B1a[Meta 標籤]
+    B1 --> B1b[PWA Manifest]
+    B1 --> B1c[Service Worker]
+    B1 --> B1d[標題與字體]
+    
+    B2 --> B2a[遊戲容器]
+    B2 --> B2b[規則彈窗]
+    B2 --> B2c[先手選擇彈窗]
+    
+    B2a --> B2a1[頂部控制欄]
+    B2a --> B2a2[遊戲棋盤]
+    B2a --> B2a3[中央訊息區]
+    
+    B2a1 --> B2a1a[左側控制組]
+    B2a1 --> B2a1b[回合指示器]
+    B2a1 --> B2a1c[右側控制組]
+    
+    B2a2 --> B2a2a[玩家2計分洞]
+    B2a2 --> B2a2b[坑洞區域]
+    B2a2 --> B2a2c[玩家1計分洞]
+    
+    B2a2b --> B2a2b1[玩家2坑洞行]
+    B2a2b --> B2a2b2[玩家1坑洞行]
+    
+    C --> C1[:root 變數]
+    C --> C2[響應式設計]
+    C --> C3[動畫效果]
+    
+    C1 --> C1a[顏色主題]
+    C1 --> C1b[尺寸定義]
+    
+    C2 --> C2a[桌面版樣式]
+    C2 --> C2b[平板版樣式]
+    C2 --> C2c[手機版樣式]
+    
+    C3 --> C3a[棋子飛行動畫]
+    C3 --> C3b[呼吸燈效果]
+    C3 --> C3c[捕獲閃光]
+    
+    D --> D1[遊戲狀態管理]
+    D --> D2[遊戲邏輯核心]
+    D --> D3[AI 系統]
+    D --> D4[UI 更新函數]
+    D --> D5[教學模式]
+    
+    D1 --> D1a[棋盤狀態]
+    D1 --> D1b[玩家回合]
+    D1 --> D1c[遊戲歷史]
+    
+    D2 --> D2a[棋子移動邏輯]
+    D2 --> D2b[捕獲規則]
+    D2 --> D2c[遊戲結束判斷]
+    
+    D3 --> D3a[簡單AI]
+    D3 --> D3b[普通AI]
+    D3 --> D3c[困難AI]
+    D3 --> D3d[專家AI]
+    D3 --> D3e[特別AI/Minimax]
+    
+    D5 --> D5a[四階段課程]
+    D5 --> D5b[逐步引導]
+    D5 --> D5c[目標高亮]
+    
+    
+    E --> E1[Manifest.json]
+    E --> E2[Service Worker]
+    E --> E3[離線快取]
+    E --> E4[安裝提示]
+    
+    %% 樣式美化
+    classDef html fill:#e34c26,color:#fff
+    classDef css fill:#264de4,color:#fff
+    classDef js fill:#f0db4f,color:#000
+    classDef pwa fill:#5a0fc8,color:#fff
+    classDef feature fill:#2ecc71,color:#000
+    
+    class B,B1,B2,B2a,B2b,B2c html
+    class C,C1,C2,C3 css
+    class D,D1,D2,D3,D4,D5 js
+    class E,E1,E2,E3,E4 pwa
+    class D5a1,D5a2,D5a3,D5a4,D3a,D3b,D3c,D3d,D3e feature
+```
 
 ##  技術棧
 
