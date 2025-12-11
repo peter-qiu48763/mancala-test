@@ -15,7 +15,7 @@
 
    <meta charset="UTF-8">
    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-   <title>播棋 Mancala</title>
+   <title>播棋 Mancala Pro</title>
    <style>
        :root {
            --bg-color: #121212;
@@ -137,7 +137,7 @@
            transform: none;
        }
 
-       /* 下拉選單樣式優化 */
+       /* 下拉選單樣式 */
        select.btn {
            appearance: none;
            padding-right: 30px;
@@ -412,6 +412,7 @@
            align-items: center;
        }
 
+       /* 規則彈窗 */
        .modal-content {
            background: #252525;
            padding: 35px;
@@ -615,14 +616,14 @@
                    <li><strong>移動：</strong> 點擊己方小洞，取出所有棋子，逆時針依序播撒。</li>
                    <li><strong>計分洞：</strong> 經過自己計分洞時會放入一顆，經過對手的則跳過。</li>
                    <li><strong>再來一次：</strong> 最後一顆落入自己的計分洞，可額外獲得一回合。</li>
-                   <li><strong>捕獲：</strong> 最後一顆落入己方空洞且對面有棋子，兩邊棋子都放入大洞。</li>
+                   <li><strong>捕獲：</strong> 最後一顆落入己方空洞且對面有棋子，兩邊棋子都放入己方大洞。</li>
                    <li><strong>結束：</strong> 一方清空所有小洞時結束，對手剩餘棋子歸對手所有。</li>
                </ul>
            </div>
            
            <hr style="border: 0; border-top: 1px solid #444; margin: 20px 0;">
            
-           <p style="color: #ccc; font-size: 0.9em; margin-bottom: 15px;">還不熟悉規則嗎？試試看教學！</p>
+           <p style="color: #ccc; font-size: 0.9em; margin-bottom: 15px;">還不熟悉規則嗎？試試看互動教學！</p>
            <button id="start-tutorial-btn" class="btn btn-tutorial" onclick="startTutorial()">🎓 開始教學模式</button>
        </div>
    </div>
@@ -655,9 +656,8 @@
        let historyStack = [];
        
        // 教學模式變數
-       let tutorialStep = 0;
+       let tutorialSequence = 0; // 0-based sequence counter
        let tutorialTarget = -1; // 當前允許點擊的坑洞
-       let tutorialPhase = null; // 用於管理教學步驟內的子狀態
 
        function init() {
            document.querySelectorAll('.pit').forEach(pit => {
@@ -714,8 +714,7 @@
            
            toggleRules(); // 關閉規則窗
            gameMode = 'tutorial';
-           tutorialStep = 1;
-           tutorialPhase = null;
+           tutorialSequence = 0;
            gameActive = true;
            isAnimating = false;
            currentPlayer = 1;
@@ -726,78 +725,87 @@
            document.getElementById('label-p2').innerText = "電腦";
            document.getElementById('turn-display').innerText = "教學模式";
            document.getElementById('turn-display').style.color = "var(--neon-3)";
+           document.getElementById('turn-display').style.borderColor = "var(--neon-3)";
            
-           setupTutorialStep(1);
+           // 1. 初始盤面設定: (0,1,6,0,1,0,14,0,3,1,1,0,3,18)
+           // 索引 0-5 (P1): 0, 1, 6, 0, 1, 0
+           // 索引 6 (Store1): 14
+           // 索引 7-12 (P2): 0, 3, 1, 1, 0, 3
+           // 索引 13 (Store2): 18
+           board = [0, 1, 6, 0, 1, 0, 14, 0, 3, 1, 1, 0, 3, 18];
+           
+           nextTutorialAction(); // 開始第一個動作
+           updateBoardUI();
            updateControlsState();
        }
        
-       function setupTutorialStep(step) {
-           tutorialStep = step;
-           currentPlayer = 1; // 確保每個步驟都由玩家開始
-           tutorialPhase = null;
-
-           if (step === 1) {
-               // 步驟 1: 基礎播棋
-               board = Array(TOTAL_PITS).fill(0);
-               board[2] = 5; 
-               // 裝飾用，避免太單調
-               board[0] = 1; board[1] = 2;
-               board[8] = 2; board[9] = 2;
-               
-               tutorialTarget = 2;
-               showMessage("課程 1：播棋", 3000, "點擊己方坑洞，棋子將逆時針依序播撒（會略過對手的計分洞）");
-           } else if (step === 2) {
-               // 步驟 2: 再來一次 (Free Turn)
-               board = Array(TOTAL_PITS).fill(1); // 全填1
-               board[P1_STORE] = 2; // 先給一點分
-               board[P2_STORE] = 2;
-               board[5] = 1; // 目標
-               board[7] = 0; 
-               
-               tutorialTarget = 5;
-               showMessage("課程 2：再來一次", 3000, "若最後一顆落在計分洞，可再行動一次");
-           } else if (step === 3) {
-               // 步驟 3: 捕獲 (Capture)
-               board = Array(TOTAL_PITS).fill(2); // 背景雜訊
-               board[P1_STORE] = 5; 
-               board[P2_STORE] = 5;
-               board[0] = 1; // 目標
-               board[1] = 0; // 落點 (空)
-               board[11] = 5; // 被捕獲對象
-               
-               tutorialTarget = 0;
-               showMessage("課程 3：捕獲", 3000, "落在己方空洞時可捕獲對面棋子");
-           } else if (step === 4) {
-               // 步驟 4: 結束遊戲
-               board = Array(TOTAL_PITS).fill(0);
-               board[5] = 1;
-               // 對手有很多棋子，展示結算時歸對方
-               for(let i=7; i<=12; i++) board[i] = 3;
-               board[P1_STORE] = 10;
-               board[P2_STORE] = 10;
-               
-               tutorialTarget = 5;
-               showMessage("課程 4：結束遊戲", 3000, "一方清空時遊戲結束，對手剩餘棋子歸對手");
+       // 根據 sequence 決定下一步行動
+       function nextTutorialAction() {
+           switch(tutorialSequence) {
+               case 0:
+                   // a. 播棋
+                   tutorialTarget = 2; // 強制選擇格子 2
+                   showMessage("播棋", 4000, "點擊己方坑洞，棋子將逆時針播撒");
+                   updateClickableState();
+                   break;
+                   
+               case 1:
+                   // 對手回應: 選擇格子 7
+                   tutorialTarget = -1; // 玩家不可點
+                   setTimeout(() => {
+                       executeTutorialAI(7);
+                   }, 1500);
+                   break;
+                   
+               case 2:
+                   // b. 再來一次 (Step 1)
+                   tutorialTarget = 5; // 強制選擇格子 5 (只有1顆，落入6 -> free turn)
+                   showMessage("再來一次", 4000, "若最後一顆落在計分洞，可再行動一次");
+                   updateClickableState();
+                   break;
+                   
+               case 3:
+                   // b. 再來一次 (Step 2)
+                   tutorialTarget = 4; // 接著強制選擇格子 4
+                   // 此時 index 4 應有 2 顆，移動後落在 Store. 
+                   showMessage("獲得額外回合", 3000, "可立即再次行動");
+                   updateClickableState();
+                   break;
+                   
+               case 4:
+                   // c. 捕獲
+                   tutorialTarget = 3; // 強制選擇格子 3 (有1顆，落入4)
+                   // Index 4 是空 (Step 3清空了) -> 觸發捕獲
+                   showMessage("捕獲", 4000, "最後一顆落在己方空洞可捕獲對面棋子");
+                   updateClickableState();
+                   break;
+                   
+               case 5:
+                   // 對手回應: 選擇格子 10
+                   tutorialTarget = -1;
+                   setTimeout(() => {
+                        executeTutorialAI(10);
+                   }, 1500);
+                   break;
+                   
+               case 6:
+                   // d. 結算
+                   tutorialTarget = 5; // 強制選擇格子 5 (有1顆)
+                   // 此時 P1 只剩 index 5 有棋子
+                   showMessage("結算", 4000, "一方清空時結束，對手剩餘棋子歸對手所有");
+                   updateClickableState();
+                   break;
+                   
+               case 7:
+                   // 結束
+                   // 遊戲結束邏輯會自動接手顯示訊息，這裡只需確保不報錯
+                   break;
            }
-           
-           updateBoardUI();
-           updateClickableState();
-           updateTurnDisplay();
        }
-
-       function nextTutorialStep() {
-           tutorialStep++;
-           if (tutorialStep > 4) {
-               showMessage("教學完成", 2000, "現在開始正式遊戲");
-               setTimeout(() => {
-                   document.getElementById('mode-select').value = 'pve';
-                   prepareGame();
-               }, 2000);
-           } else {
-               setTimeout(() => {
-                   setupTutorialStep(tutorialStep);
-               }, 1500);
-           }
+       
+       function executeTutorialAI(moveIndex) {
+           showMessage("對手行動", 1000);
+           playTurn(moveIndex);
        }
 
        /* -------------- 遊戲核心 -------------- */
@@ -939,15 +947,8 @@
            
            // 教學模式特殊處理
            if (gameMode === 'tutorial') {
-               if (tutorialPhase === 'free_move') {
-                   // 自由行動階段，允許玩家點擊任意己方非空洞
-                   if (index < 0 || index > 5 || board[index] === 0) {
-                       // 這裡不需要顯示錯誤，標準邏輯會擋掉
-                       if (board[index] === 0 && index >= 0 && index <= 5) showMessage("不可選擇空洞", 800);
-                       return;
-                   }
-               } else if (index !== tutorialTarget) {
-                   showMessage("請點擊亮起的洞", 1000);
+               if (index !== tutorialTarget) {
+                   showMessage("請依照教學引導", 1000);
                    return;
                }
            }
@@ -968,7 +969,6 @@
        }
 
        async function playTurn(startIndex) {
-           const currentPhase = tutorialPhase; // 記錄當前階段
            isAnimating = true;
            updateClickableState(); 
            updateControlsState(); 
@@ -1028,34 +1028,29 @@
            const landedInStore = (currentPlayer === 1 && currentIndex === P1_STORE) ||
                                  (currentPlayer === 2 && currentIndex === P2_STORE);
 
-           // 檢查遊戲結束 (使用布林值判定，不在此處直接呼叫 cleanup)
+           // 檢查遊戲結束 (使用布林值判定)
            const isGameOver = checkGameOverCondition();
 
            if (isGameOver) {
                gameActive = false;
                await endGameCleanup(); // 等待結算動畫完成
                
-               // 教學模式：課程 4 結算完後延遲結束
-               if (gameMode === 'tutorial' && tutorialStep === 4) {
-                   setTimeout(nextTutorialStep, 2500);
+               // 教學模式結束
+               if (gameMode === 'tutorial') {
+                   setTimeout(() => {
+                       showMessage("教學完成", 2000, "現在開始正式遊戲");
+                       setTimeout(() => {
+                           document.getElementById('mode-select').value = 'pve';
+                           prepareGame();
+                       }, 2000);
+                   }, 2500);
                }
                return; // 遊戲結束，終止後續邏輯
            }
 
            if (gameActive) {
                if (landedInStore) {
-                   // 教學模式課程 2 特殊處理
-                   if (gameMode === 'tutorial' && tutorialStep === 2 && currentPhase !== 'free_move') {
-                       showMessage("再來一次", 2000, "最後一顆落入計分洞，獲得額外回合");
-                       tutorialPhase = 'free_move';
-                       
-                       isAnimating = false;
-                       updateClickableState(); // 更新高亮狀態 (全體)
-                       updateControlsState();
-                       return; // 不切換回合，等待玩家再次行動
-                   } else {
-                       showMessage("再來一次", 1000, "最後一顆落入計分洞");
-                   }
+                   showMessage("再來一次", 1000, "最後一顆落入計分洞");
                } else {
                    currentPlayer = currentPlayer === 1 ? 2 : 1;
                }
@@ -1065,13 +1060,18 @@
                updateClickableState();
                updateControlsState(); 
                
+               // 核心流程控制
                if (gameMode === 'tutorial') {
-                   // 如果處於自由行動階段結束
-                   if (tutorialStep === 2 && currentPhase === 'free_move') {
-                       tutorialPhase = null;
-                       nextTutorialStep();
-                   } else if (tutorialStep === 1 || tutorialStep === 3) {
-                       nextTutorialStep();
+                   tutorialSequence++; // 進入下一個劇本步驟
+                   
+                   // 延遲處理：
+                   // Seq 1 (AI) -> 2: 對手行動後
+                   // Seq 3 (Player) -> 4: 再來一次提示後進入捕獲
+                   // Seq 5 (AI) -> 6: 對手行動後
+                   if (tutorialSequence === 2 || tutorialSequence === 4 || tutorialSequence === 6) {
+                       setTimeout(nextTutorialAction, 750);
+                   } else {
+                       nextTutorialAction();
                    }
                } else if (gameMode === 'pve' && currentPlayer === 2 && gameActive) {
                    setTimeout(npcLogic, 1000);
@@ -1472,10 +1472,7 @@
            updateControlsState();
            updateClickableState(); 
            
-           // 修復：如果是教學模式第四關，也顯示結束遊戲提示
-           if (gameMode !== 'tutorial' || (gameMode === 'tutorial' && tutorialStep === 4)) {
-               showMessage("遊戲結束", 3000, "移動剩下的棋子");
-           }
+           showMessage("遊戲結束", 3000, "移動剩下的棋子");
 
            const animations = [];
            const slowDuration = 1200; 
@@ -1500,7 +1497,6 @@
            updateBoardUI();
 
            if (gameMode === 'tutorial') {
-                // 教學模式結束後，將動畫狀態設為false，避免按鈕鎖死
                 isAnimating = false;
                 updateControlsState();
                 return;
@@ -1536,7 +1532,7 @@
            if (!gameActive) return;
            
            if (gameMode === 'tutorial') {
-                el.innerText = `教學課程 ${tutorialStep}/4`;
+                el.innerText = `教學模式`;
                 el.style.color = 'var(--neon-3)';
                 el.style.borderColor = 'var(--neon-3)';
                 return;
@@ -1625,16 +1621,9 @@
                    }
                    
                    // 教學模式：強力高亮目標
-                   if (gameMode === 'tutorial') {
-                       if (tutorialPhase === 'free_move') {
-                            // 自由行動：高亮所有可點擊的己方洞
-                            if (id >= 0 && id <= 5 && board[id] > 0) {
-                                pit.classList.add('active-turn-glow');
-                            }
-                       } else if (id === tutorialTarget) {
-                           pit.classList.add('tutorial-target');
-                           pit.classList.remove('active-turn-glow'); 
-                       }
+                   if (gameMode === 'tutorial' && id === tutorialTarget) {
+                       pit.classList.add('tutorial-target');
+                       pit.classList.remove('active-turn-glow'); 
                    }
                }
 
@@ -1651,9 +1640,7 @@
                
                // 教學模式：非目標全部禁用
                if (gameMode === 'tutorial' && !pit.classList.contains('disabled')) {
-                   if (tutorialPhase === 'free_move') {
-                       // 自由行動：允許所有己方非空洞，無需禁用
-                   } else if (id !== tutorialTarget) {
+                   if (id !== tutorialTarget) {
                        pit.classList.add('disabled');
                        pit.style.cursor = 'not-allowed';
                        pit.style.opacity = '0.4';
